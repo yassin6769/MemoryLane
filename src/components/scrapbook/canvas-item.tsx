@@ -2,18 +2,22 @@
 
 import { useState, useRef, type MouseEvent } from "react";
 import Image from "next/image";
-import type { CanvasItem as CanvasItemType } from "@/lib/data";
 import { cn } from "@/lib/utils";
+import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { doc, getFirestore, serverTimestamp } from "firebase/firestore";
 
 interface CanvasItemProps {
-  item: CanvasItemType;
+  item: any;
   onUpdatePosition: (id: string, x: number, y: number) => void;
+  scrapbookId: string;
+  pageId: string;
 }
 
-export function CanvasItem({ item, onUpdatePosition }: CanvasItemProps) {
+export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: CanvasItemProps) {
   const [isDragging, setIsDragging] = useState(false);
   const dragStartPos = useRef({ x: 0, y: 0 });
   const itemStartPos = useRef({ x: 0, y: 0 });
+  const db = getFirestore();
 
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
     setIsDragging(true);
@@ -30,31 +34,62 @@ export function CanvasItem({ item, onUpdatePosition }: CanvasItemProps) {
     onUpdatePosition(item.id, itemStartPos.current.x + dx, itemStartPos.current.y + dy);
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e: globalThis.MouseEvent) => {
     setIsDragging(false);
     window.removeEventListener("mousemove", handleMouseMove);
     window.removeEventListener("mouseup", handleMouseUp);
+
+    const dx = e.clientX - dragStartPos.current.x;
+    const dy = e.clientY - dragStartPos.current.y;
+    
+    // Finalize the update in Firestore
+    const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", item.id);
+    updateDocumentNonBlocking(docRef, {
+      x: itemStartPos.current.x + dx,
+      y: itemStartPos.current.y + dy,
+      updatedAt: serverTimestamp(),
+    });
   };
 
   const renderContent = () => {
     switch (item.type) {
       case "image":
         return (
-          <Image
-            src={item.content}
-            alt="Canvas item"
-            width={item.width}
-            height={item.height}
-            className="w-full h-full object-cover pointer-events-none"
-            data-ai-hint="photo memory"
-          />
+          <div className="relative w-full h-full overflow-hidden rounded-sm">
+            <Image
+              src={item.mediaUri}
+              alt="Memory"
+              fill
+              className="object-cover pointer-events-none"
+              unoptimized
+            />
+          </div>
         );
       case "text":
         return (
-          <div className="w-full h-full p-2 flex items-center justify-center pointer-events-none">
-            <p className="text-xl font-headline" style={{ transform: `scale(${item.scale})` }}>
-              {item.content}
+          <div className="w-full h-full p-4 flex items-center justify-center pointer-events-none">
+            <p className="text-2xl font-headline text-center leading-tight">
+              {item.text}
             </p>
+          </div>
+        );
+      case "video":
+        return (
+          <video 
+            src={item.mediaUri} 
+            className="w-full h-full object-cover pointer-events-none"
+            muted
+            autoPlay
+            loop
+          />
+        );
+      case "audio":
+        return (
+          <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-primary/10 rounded-lg pointer-events-none">
+            <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center mb-2">
+              <div className="w-4 h-4 bg-white rounded-full animate-pulse" />
+            </div>
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Audio Memory</p>
           </div>
         );
       default:
@@ -66,16 +101,16 @@ export function CanvasItem({ item, onUpdatePosition }: CanvasItemProps) {
     <div
       onMouseDown={handleMouseDown}
       className={cn(
-        "absolute rounded-md shadow-lg transition-shadow duration-300",
-        isDragging ? "cursor-grabbing shadow-2xl z-10" : "cursor-grab",
-        item.type === "text" ? "" : "bg-card"
+        "absolute transition-shadow duration-300",
+        isDragging ? "cursor-grabbing shadow-2xl ring-2 ring-primary z-50 scale-105" : "cursor-grab shadow-lg",
+        item.type === "text" ? "bg-transparent" : "bg-white p-2"
       )}
       style={{
         left: `${item.x}px`,
         top: `${item.y}px`,
         width: `${item.width}px`,
         height: `${item.height}px`,
-        transform: `rotate(${item.rotation}deg) scale(${item.scale})`,
+        transform: `rotate(${item.rotation || 0}deg)`,
         transformOrigin: 'center center',
       }}
     >
