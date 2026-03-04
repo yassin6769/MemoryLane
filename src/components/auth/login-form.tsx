@@ -49,25 +49,32 @@ export function LoginForm() {
     },
   });
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
-      toast({
-        title: "Signed In!",
-        description: "Welcome back!",
+    // Using non-blocking promise chain to handle auth and feedback
+    signInWithEmailAndPassword(auth, values.email, values.password)
+      .then(() => {
+        toast({
+          title: "Signed In!",
+          description: "Welcome back!",
+        });
+        router.push("/dashboard");
+      })
+      .catch((error: any) => {
+        let description = "Invalid login credentials. Please try again.";
+        if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+          description = "The email or password you entered is incorrect.";
+        }
+        
+        toast({
+          variant: "destructive",
+          title: "Login failed",
+          description,
+        });
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
-      router.push("/dashboard");
-    } catch (error: any) {
-      console.error("Login error:", error);
-      toast({
-        variant: "destructive",
-        title: "Uh oh! Something went wrong.",
-        description: "Invalid login credentials. Please try again.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
   }
 
   return (

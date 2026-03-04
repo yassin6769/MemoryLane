@@ -53,38 +53,41 @@ export function SignupForm() {
     },
   });
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        values.email,
-        values.password
-      );
-      const user = userCredential.user;
-      
-      // Create user profile in Firestore
-      createUserProfile(firestore, user, values.fullName);
+    // Using non-blocking promise chain for signup flow
+    createUserWithEmailAndPassword(auth, values.email, values.password)
+      .then((userCredential) => {
+        const user = userCredential.user;
+        
+        // Create user profile in Firestore (non-blocking)
+        createUserProfile(firestore, user, values.fullName);
 
-      toast({
-        title: "Account Created!",
-        description: "Welcome! You have been successfully signed up.",
+        toast({
+          title: "Account Created!",
+          description: "Welcome! You have been successfully signed up.",
+        });
+        router.push("/dashboard");
+      })
+      .catch((error: any) => {
+        let description = "There was a problem with your request.";
+        if (error.code === 'auth/email-already-in-use') {
+          description = "This email is already in use. Please try logging in.";
+        } else if (error.code === 'auth/invalid-email') {
+          description = "Please enter a valid email address.";
+        } else if (error.code === 'auth/weak-password') {
+          description = "The password is too weak. Please use at least 6 characters.";
+        }
+        
+        toast({
+          variant: "destructive",
+          title: "Signup failed",
+          description,
+        });
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
-      router.push("/dashboard");
-    } catch (error: any) {
-      console.error("Signup error:", error);
-      let description = "There was a problem with your request.";
-      if (error.code === 'auth/email-already-in-use') {
-        description = "This email is already in use. Please try logging in.";
-      }
-      toast({
-        variant: "destructive",
-        title: "Uh oh! Something went wrong.",
-        description,
-      });
-    } finally {
-      setIsLoading(false);
-    }
   }
 
   return (
