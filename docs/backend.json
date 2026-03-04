@@ -1,0 +1,396 @@
+{
+  "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user's profile and personal settings within the MemoryLane application. This entity stores core user information separate from authentication credentials.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserProfile entity. This serves as the primary key."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address, used for identification and contact.",
+          "format": "email"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "A user-friendly name chosen by the user for display purposes."
+        },
+        "profilePictureUri": {
+          "type": "string",
+          "description": "URI to the user's profile picture stored in Firebase Storage (optional).",
+          "format": "uri"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user profile was initially created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user profile was last updated.",
+          "format": "date-time"
+        },
+        "ownedScrapbookIds": {
+          "type": "array",
+          "description": "References to Scrapbook entities that are owned by this user. (Relationship: UserProfile 1:N Scrapbook)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "settings": {
+          "type": "array",
+          "description": "An array of user-specific application settings and preferences (e.g., UI themes, notification settings).",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "displayName",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Scrapbook": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Scrapbook",
+      "type": "object",
+      "description": "Represents a digital scrapbook, a free-form creative canvas composed of multiple pages containing multimedia content.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Scrapbook entity. This serves as the primary key."
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the scrapbook, chosen by the owner."
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "Reference to the UserProfile entity who owns this scrapbook. (Relationship: UserProfile 1:N Scrapbook)"
+        },
+        "category": {
+          "type": "string",
+          "description": "The thematic category of the scrapbook (e.g., 'Holiday', 'Birthday', 'Travel', 'Family', 'Friends')."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the scrapbook was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the scrapbook was last updated.",
+          "format": "date-time"
+        },
+        "pageIds": {
+          "type": "array",
+          "description": "References to Page entities that belong to this scrapbook, in their display order. (Relationship: Scrapbook 1:N Page)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "collaboratorPermissionIds": {
+          "type": "array",
+          "description": "References to Permission entities that define access rights for other users collaborating on this scrapbook. (Relationship: Scrapbook N:N UserProfile via Permission)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "ownerId",
+        "category",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Page": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Page",
+      "type": "object",
+      "description": "Represents a single page within a scrapbook, serving as a canvas for various multimedia objects.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Page entity. This serves as the primary key."
+        },
+        "scrapbookId": {
+          "type": "string",
+          "description": "Reference to the Scrapbook entity this page belongs to. (Relationship: Scrapbook 1:N Page)"
+        },
+        "pageNumber": {
+          "type": "number",
+          "description": "The sequential number of the page within its scrapbook, used for ordering."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the page was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the page was last updated.",
+          "format": "date-time"
+        },
+        "canvasObjectIds": {
+          "type": "array",
+          "description": "References to CanvasObject entities placed on this page, representing various media elements. (Relationship: Page 1:N CanvasObject)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "scrapbookId",
+        "pageNumber",
+        "createdAt",
+        "updatedAt",
+        "canvasObjectIds"
+      ]
+    },
+    "CanvasObject": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "CanvasObject",
+      "type": "object",
+      "description": "Represents a single multimedia element (image, video, audio, or text) placed on a Page's canvas, including its position, scale, and rotation.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the CanvasObject entity. This serves as the primary key."
+        },
+        "pageId": {
+          "type": "string",
+          "description": "Reference to the Page entity this canvas object belongs to. (Relationship: Page 1:N CanvasObject)"
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of content this canvas object represents (e.g., 'image', 'video', 'audio', 'text')."
+        },
+        "mediaUri": {
+          "type": "string",
+          "description": "The URI link to the stored media asset in Firebase Storage. Applicable and required for 'image', 'video', 'audio' types.",
+          "format": "uri"
+        },
+        "text": {
+          "type": "string",
+          "description": "The text content for 'text' type canvas objects. Optional for media types."
+        },
+        "x": {
+          "type": "number",
+          "description": "The X-coordinate (horizontal position) of the object's anchor point on the canvas."
+        },
+        "y": {
+          "type": "number",
+          "description": "The Y-coordinate (vertical position) of the object's anchor point on the canvas."
+        },
+        "rotation": {
+          "type": "number",
+          "description": "The rotation angle of the object in degrees (0-360)."
+        },
+        "scaleX": {
+          "type": "number",
+          "description": "The horizontal scaling factor of the object relative to its original size."
+        },
+        "scaleY": {
+          "type": "number",
+          "description": "The vertical scaling factor of the object relative to its original size."
+        },
+        "width": {
+          "type": "number",
+          "description": "The rendered width of the object on the canvas, potentially after scaling, or for a text box."
+        },
+        "height": {
+          "type": "number",
+          "description": "The rendered height of the object on the canvas, potentially after scaling, or for a text box."
+        },
+        "zIndex": {
+          "type": "number",
+          "description": "The stacking order (Z-index) of the object on the canvas, determining which objects appear on top."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the canvas object was added to the page.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the canvas object was last modified.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "pageId",
+        "type",
+        "x",
+        "y",
+        "rotation",
+        "scaleX",
+        "scaleY",
+        "width",
+        "height",
+        "zIndex",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Permission": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Permission",
+      "type": "object",
+      "description": "Manages access control for shared scrapbooks, linking specific users to scrapbooks with defined collaboration roles.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Permission entity. This serves as the primary key."
+        },
+        "scrapbookId": {
+          "type": "string",
+          "description": "Reference to the Scrapbook entity to which this permission applies. (Relationship: Scrapbook N:N UserProfile via Permission)"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the UserProfile entity who is granted this permission. (Relationship: Scrapbook N:N UserProfile via Permission)"
+        },
+        "accessLevel": {
+          "type": "string",
+          "description": "The level of access granted to the user for the scrapbook (e.g., 'view-only', 'edit')."
+        },
+        "grantedByUserId": {
+          "type": "string",
+          "description": "Reference to the UserProfile entity who granted this permission."
+        },
+        "grantedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the permission was granted.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "scrapbookId",
+        "userId",
+        "accessLevel",
+        "grantedByUserId",
+        "grantedAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores user-specific profile data. Access is restricted to the owning user. The 'ownedScrapbookIds' field from the original schema is removed to avoid data duplication for authorization purposes; ownership of scrapbooks is determined by the 'ownerId' field within the Scrapbook documents, and collaboration via the denormalized 'members' map. This ensures Authorization Independence and QAP compliance. 'settings' field should be an array of objects to ensure predictable schema.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique ID of the user, matching 'request.auth.uid'."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/scrapbooks/{scrapbookId}",
+        "definition": {
+          "entityName": "Scrapbook",
+          "schema": {
+            "$ref": "#/backend/entities/Scrapbook"
+          },
+          "description": "Represents a digital scrapbook. Each document includes an 'ownerId' and a denormalized 'members' map (e.g., {uid1: 'owner', uid2: 'editor'}) for authorization. The 'pageIds' and 'collaboratorPermissionIds' fields from the original schema are removed; direct references are managed via subcollections and the denormalized 'members' map. This ensures Authorization Independence, allowing rules to check access without 'get()' operations, and supports QAP for listing collaborative scrapbooks.",
+          "params": [
+            {
+              "name": "scrapbookId",
+              "description": "The unique ID of the scrapbook."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/scrapbooks/{scrapbookId}/pages/{pageId}",
+        "definition": {
+          "entityName": "Page",
+          "schema": {
+            "$ref": "#/backend/entities/Page"
+          },
+          "description": "A page within a specific scrapbook. Each document includes denormalized 'ownerId' and 'members' map (inherited from its parent Scrapbook) for authorization independence. The 'canvasObjectIds' field from the original schema is removed, as CanvasObjects are managed in a subcollection. This enables rules to check access directly without 'get()' calls on parent documents, supporting QAP for listing pages.",
+          "params": [
+            {
+              "name": "scrapbookId",
+              "description": "The unique ID of the parent scrapbook."
+            },
+            {
+              "name": "pageId",
+              "description": "The unique ID of the page within the scrapbook."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/scrapbooks/{scrapbookId}/pages/{pageId}/canvasObjects/{canvasObjectId}",
+        "definition": {
+          "entityName": "CanvasObject",
+          "schema": {
+            "$ref": "#/backend/entities/CanvasObject"
+          },
+          "description": "Individual multimedia elements on a page. Each document includes denormalized 'ownerId' and 'members' map (inherited from its grandparent Scrapbook) for authorization independence. This allows rules to check access directly without 'get()' calls on parent documents, supporting QAP for listing canvas objects.",
+          "params": [
+            {
+              "name": "scrapbookId",
+              "description": "The unique ID of the grandparent scrapbook."
+            },
+            {
+              "name": "pageId",
+              "description": "The unique ID of the parent page."
+            },
+            {
+              "name": "canvasObjectId",
+              "description": "The unique ID of the canvas object."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/scrapbooks/{scrapbookId}/permissions/{permissionId}",
+        "definition": {
+          "entityName": "Permission",
+          "schema": {
+            "$ref": "#/backend/entities/Permission"
+          },
+          "description": "Manages specific access rights for a user on a given scrapbook. This collection acts as the source for updating the denormalized 'members' map in the parent Scrapbook and its subcollections (Pages, CanvasObjects) via Cloud Functions. Access to these documents should be restricted to the scrapbook owner. This enables Authorization Independence for other entities and supports QAP for managing permissions.",
+          "params": [
+            {
+              "name": "scrapbookId",
+              "description": "The unique ID of the scrapbook to which this permission applies."
+            },
+            {
+              "name": "permissionId",
+              "description": "The unique ID of the permission entry."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The proposed Firestore structure prioritizes Authorization Independence and Query-Aware Security Rules (QAPs) by implementing strategic denormalization and structural segregation. User profiles are stored in a top-level `/users/{userId}` collection, leveraging path-based ownership for simple, private access control where `request.auth.uid` directly maps to `userId`. This makes `UserProfile` data inherently secure and queryable for the owning user without complex rules.\n\nFor collaborative entities like 'Scrapbook', 'Page', and 'CanvasObject', a different approach is taken to enable QAPs and eliminate `get()` calls in security rules. A top-level `/scrapbooks/{scrapbookId}` collection is used to house all scrapbooks, whether private or collaborative. Crucially, each `Scrapbook` document will include an `ownerId` field (referencing the UserProfile) and a denormalized `members` map (e.g., `members: { 'userId1': 'owner', 'userId2': 'editor', 'userId3': 'viewer' }`). This `members` map is derived from the `Permission` entities and encapsulates all users with access to that scrapbook, along with their roles.\n\nThis denormalized `members` map is then further propagated (denormalized) into all `Page` documents within `/scrapbooks/{scrapbookId}/pages/{pageId}` and all `CanvasObject` documents within `/scrapbooks/{scrapbookId}/pages/{pageId}/canvasObjects/{canvasObjectId}`. This means that any `Page` or `CanvasObject` document can be authorized directly by checking `request.auth.uid in resource.data.members` without needing to retrieve parent or grandparent documents. This completely eliminates hierarchical authorization dependencies (`get()`) as mandated, ensuring atomic operations and robust security.\n\n**How QAPs are achieved:**\n1.  **For UserProfile:** Users can easily query their own profile: `db.collection('users').doc(request.auth.uid).get()`. Security rules would simply be `allow read, write: if request.auth.uid == userId;`.\n2.  **For Scrapbooks (and Pages/CanvasObjects):** Users can efficiently list all scrapbooks they own or collaborate on by performing a query such as `db.collection('scrapbooks').where('members.' + request.auth.uid, 'in', ['owner', 'editor', 'viewer'])`. The Firestore security rules can then directly validate this query using `allow list: if request.auth.uid in resource.data.members;`. Because the `members` map is present in *every* `Scrapbook`, `Page`, and `CanvasObject` document, `list` operations on these collections (or subcollections) can be performed securely and efficiently, as the rule can filter results based on the denormalized data within each document. This fulfills the QAP requirement, ensuring rules are not filters but rather gatekeepers for valid queries.\n\nFinally, the `Permission` entity, `/scrapbooks/{scrapbookId}/permissions/{permissionId}`, acts as the atomic source for individual permission grants. Changes to these documents will trigger a Cloud Function to update the denormalized `members` map across the relevant `Scrapbook` and its descendant `Page` and `CanvasObject` documents, maintaining eventual consistency and the integrity of the authorization model."
+  }
+}

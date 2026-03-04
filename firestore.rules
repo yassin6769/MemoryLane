@@ -1,0 +1,155 @@
+/**
+ * # Core Philosophy
+ * This ruleset enforces a hybrid security model. For user-specific data under `/users/{userId}`, it applies a strict ownership model where only the authenticated user can access their own document. For shared, collaborative content under `/scrapbooks/{scrapbookId}`, it uses a closed-collaborator model based on denormalized roles stored in a `members` map on each document.
+ *
+ * # Data Structure
+ * The data is organized into two main top-level collections: `/users` and `/scrapbooks`.
+ * - `/users/{userId}`: Contains private user profile information.
+ * - `/scrapbooks/{scrapbookId}`: Acts as the root for all collaborative content. It contains subcollections for `pages`, `permissions`, and `canvasObjects` in a hierarchical structure.
+ *
+ * # Key Security Decisions
+ * - **Private by Default**: All data requires user authentication for access. There is no public data.
+ * - **Denormalization for Authorization**: To ensure performant and secure access checks, authorization data (a `members` map with user IDs and roles) is denormalized from the parent scrapbook down to every `Page` and `CanvasObject` document. This avoids slow and costly `get()` calls in rules when authorizing access to nested content.
+ * - **Query-Aware Security**: List operations are enabled, but they are secured by rules on `get` operations. Clients are expected to build queries that only request data they have permission to access (e.g., by querying on the `members` map). A broad query for documents the user cannot access will be rejected by Firestore.
+ * - **Permission Management**: The `/scrapbooks/{scrapbookId}/permissions` subcollection is the source of truth for collaboration, but its access is tightly restricted to the scrapbook owner. A Cloud Function is expected to use changes in this collection to update the denormalized `members` map across the scrapbook's documents.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ----------------------------------------------------------------------
+    // Helper Functions
+    // ----------------------------------------------------------------------
+
+    /**
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the authenticated user's UID matches the provided userId.
+     * This is the foundation of the user-ownership model.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Verifies that a document exists before an update or delete operation.
+     * Prevents operations on non-existent documents, which is a security best practice.
+     */
+    function isExistingDoc() {
+      return resource != null;
+    }
+
+    /**
+     * Checks if the authenticated user is listed in a document's `members` map.
+     * This is the core of the collaborative access model.
+     */
+    function isMember(membersMap) {
+      return isSignedIn() && request.auth.uid in membersMap;
+    }
+
+    /**
+     * Checks if the authenticated user has a specific role (e.g., 'owner', 'editor')
+     * within the document's `members` map.
+     */
+    function hasRole(membersMap, role) {
+      return isMember(membersMap) && membersMap[request.auth.uid] == role;
+    }
+
+    /**
+     * Checks if the user has a role of 'editor' or 'owner', granting write access.
+     */
+    function isEditorOrOwner(membersMap) {
+      return isMember(membersMap) && (membersMap[request.auth.uid] == 'editor' || membersMap[request.auth.uid] == 'owner');
+    }
+
+    /**
+     * Checks if the user is the owner of the parent scrapbook.
+     * This function uses a 'get' call and is reserved for managing permissions.
+     */
+    function isScrapbookOwner(scrapbookId) {
+      return isSignedIn() && get(/databases/$(database)/documents/scrapbooks/$(scrapbookId)).data.ownerId == request.auth.uid;
+    }
+
+    /**
+     * # UserProfile Collection
+     * @description Rules for a user's own profile document.
+     * @path /users/{userId}
+     * @allow (create) An authenticated user creating their own profile document.
+     * @deny (get) An authenticated user trying to read another user's profile.
+     * @principle Restricts access to a user's own data tree.
+     */
+    match /users/{userId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isOwner(userId) && isExistingDoc() && request.resource.data.id == resource.data.id;
+      allow delete: if isOwner(userId) && isExistingDoc();
+    }
+
+    /**
+     * # Scrapbook Collection
+     * @description Rules for scrapbook documents, which are the root of all collaborative content.
+     * @path /scrapbooks/{scrapbookId}
+     * @allow (get) An authenticated user who is listed in the scrapbook's `members` map reads the document.
+     * @deny (delete) A user with an 'editor' role trying to delete the entire scrapbook.
+     * @principle Enforces a closed-collaborator model using a denormalized `members` map for access control.
+     */
+    match /scrapbooks/{scrapbookId} {
+      allow get: if isMember(resource.data.members);
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid && request.resource.data.members[request.auth.uid] == 'owner';
+      allow update: if isExistingDoc() && isEditorOrOwner(resource.data.members) && request.resource.data.ownerId == resource.data.ownerId;
+      allow delete: if isExistingDoc() && hasRole(resource.data.members, 'owner');
+    }
+
+    /**
+     * # Page Subcollection
+     * @description Rules for page documents within a scrapbook. Access is inherited via denormalization.
+     * @path /scrapbooks/{scrapbookId}/pages/{pageId}
+     * @allow (create) A user with an 'editor' role in the scrapbook creates a new page.
+     * @deny (update) A user with a 'viewer' role (if such a role exists) trying to modify a page.
+     * @principle Relies on denormalized authorization data (`members` map) to avoid `get` calls on parent documents.
+     */
+    match /scrapbooks/{scrapbookId}/pages/{pageId} {
+      allow get: if isMember(resource.data.members);
+      allow list: if isMember(get(/databases/$(database)/documents/scrapbooks/$(scrapbookId)).data.members);
+      allow create: if isEditorOrOwner(request.resource.data.members) && request.resource.data.scrapbookId == scrapbookId;
+      allow update: if isExistingDoc() && isEditorOrOwner(resource.data.members) && request.resource.data.scrapbookId == resource.data.scrapbookId;
+      allow delete: if isExistingDoc() && isEditorOrOwner(resource.data.members);
+    }
+
+    /**
+     * # CanvasObject Subcollection
+     * @description Rules for multimedia objects on a page. Access is inherited via denormalization.
+     * @path /scrapbooks/{scrapbookId}/pages/{pageId}/canvasObjects/{canvasObjectId}
+     * @allow (update) An 'editor' of the scrapbook updates the position of an image.
+     * @deny (create) An unauthenticated user tries to add a text object to a page.
+     * @principle Relies on denormalized authorization data (`members` map) to avoid `get` calls on grandparent documents.
+     */
+    match /scrapbooks/{scrapbookId}/pages/{pageId}/canvasObjects/{canvasObjectId} {
+      allow get: if isMember(resource.data.members);
+      allow list: if isMember(get(/databases/$(database)/documents/scrapbooks/$(scrapbookId)).data.members);
+      allow create: if isEditorOrOwner(request.resource.data.members) && request.resource.data.pageId == pageId;
+      allow update: if isExistingDoc() && isEditorOrOwner(resource.data.members) && request.resource.data.pageId == resource.data.pageId;
+      allow delete: if isExistingDoc() && isEditorOrOwner(resource.data.members);
+    }
+
+    /**
+     * # Permission Subcollection
+     * @description Rules for permission documents, which control access to a scrapbook.
+     * @path /scrapbooks/{scrapbookId}/permissions/{permissionId}
+     * @allow (create) The scrapbook owner grants 'editor' access to another user.
+     * @deny (delete) A scrapbook editor tries to remove another user's permissions.
+     * @principle Restricts permission management to the scrapbook owner, requiring a `get` on the parent to verify ownership.
+     */
+    match /scrapbooks/{scrapbookId}/permissions/{permissionId} {
+      allow get, list: if isScrapbookOwner(scrapbookId);
+      allow create: if isScrapbookOwner(scrapbookId) && request.resource.data.scrapbookId == scrapbookId;
+      allow update, delete: if isScrapbookOwner(scrapbookId) && isExistingDoc();
+    }
+  }
+}

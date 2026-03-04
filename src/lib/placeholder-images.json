@@ -1,0 +1,58 @@
+{
+  "placeholderImages": [
+    {
+      "id": "scrapbook-cover-1",
+      "description": "A vibrant scrapbook cover with a holiday theme.",
+      "imageUrl": "https://images.unsplash.com/photo-1476986570916-c34f492f2ed3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxob2xpZGF5JTIwdHJhdmVsfGVufDB8fHx8MTc3MDEzMTk5M3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "holiday travel"
+    },
+    {
+      "id": "scrapbook-cover-2",
+      "description": "A birthday themed scrapbook cover.",
+      "imageUrl": "https://images.unsplash.com/photo-1556125574-d7f27ec36a06?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxiaXJ0aGRheSUyMHBhcnR5fGVufDB8fHx8MTc3MDA4NTI4NXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "birthday party"
+    },
+    {
+      "id": "scrapbook-cover-3",
+      "description": "A family memories scrapbook cover.",
+      "imageUrl": "https://images.unsplash.com/photo-1581579186913-45ac3e6efe93?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8ZmFtaWx5JTIwcG9ydHJhaXR8ZW58MHx8fHwxNzcwMDY1NzIxfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "family portrait"
+    },
+    {
+      "id": "scrapbook-cover-4",
+      "description": "A wedding themed scrapbook cover.",
+      "imageUrl": "https://images.unsplash.com/photo-1624634564754-e45be6d06159?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHx3ZWRkaW5nJTIwY2VsZWJyYXRpb258ZW58MHx8fHwxNzcwMDc3Mjg3fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "wedding celebration"
+    },
+    {
+      "id": "canvas-item-1",
+      "description": "A picture from a beach vacation.",
+      "imageUrl": "https://images.unsplash.com/photo-1601562219653-0f16522227b3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8YmVhY2glMjBzdW5zZXR8ZW58MHx8fHwxNzcwMDI2ODk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "beach sunset"
+    },
+    {
+      "id": "canvas-item-2",
+      "description": "A picture of a birthday cake.",
+      "imageUrl": "https://images.unsplash.com/photo-1610670444950-0b29430891b4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxiaXJ0aGRheSUyMGNha2V8ZW58MHx8fHwxNzcwMTIzNTkxfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "birthday cake"
+    },
+    {
+      "id": "user-avatar-1",
+      "description": "User avatar 1",
+      "imageUrl": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxwZXJzb24lMjBwb3J0cmFpdHxlbnwwfHx8fDE3NzAwMTIyNzd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person portrait"
+    },
+    {
+      "id": "user-avatar-2",
+      "description": "User avatar 2",
+      "imageUrl": "https://images.unsplash.com/photo-1610655507808-a59293f4e332?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHx3b21hbiUyMHBvcnRyYWl0fGVufDB8fHx8MTc3MDExMjU4OHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "woman portrait"
+    },
+    {
+      "id": "user-avatar-3",
+      "description": "User avatar 3",
+      "imageUrl": "https://images.unsplash.com/photo-1522556189639-b150ed9c4330?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxtYW4lMjBwb3J0cmFpdHxlbnwwfHx8fDE3NzAwNzk1MTl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "man portrait"
+    }
+  ]
+}
