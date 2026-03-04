@@ -30,6 +30,7 @@ export async function createScrapbook(
     updatedAt: serverTimestamp(),
     pageIds: [],
     collaboratorPermissionIds: [],
+    collaboratorIds: [], // Explicitly initialize the array to prevent UI crashes
     members: {
       [user.uid]: 'owner',
     },

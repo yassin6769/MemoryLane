@@ -16,12 +16,17 @@ interface ToolbarProps {
 }
 
 export function Toolbar({ scrapbook }: ToolbarProps) {
+  // Ensure we have an array to map over even if the field is missing in Firestore
+  const collaboratorIds = scrapbook.collaboratorIds || [];
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div className="flex items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold font-headline">{scrapbook.title}</h1>
-          <Badge variant="outline">{scrapbook.category}</Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline">{scrapbook.category}</Badge>
+          </div>
         </div>
       </div>
       <div className="flex items-center gap-2">
@@ -43,7 +48,7 @@ export function Toolbar({ scrapbook }: ToolbarProps) {
         </Button>
         <div className="h-6 border-l mx-2" />
         <div className="flex -space-x-2 mr-2">
-          {scrapbook.collaboratorIds.map((id, index) => (
+          {collaboratorIds.map((id, index) => (
             <Avatar key={id} className="h-8 w-8 border-2 border-background">
               <AvatarImage src={`https://picsum.photos/seed/30${index + 2}/40/40`} />
               <AvatarFallback>U{index + 2}</AvatarFallback>
