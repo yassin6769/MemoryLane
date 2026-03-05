@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
-  FileDown,
   ImagePlus,
   Mic,
   Share2,
@@ -14,11 +14,12 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useUser, useStorage } from "@/firebase";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { collection, doc, serverTimestamp } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { CollaboratorDialog } from "./collaborator-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,7 @@ interface ToolbarProps {
 }
 
 export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
+  const router = useRouter();
   const { toast } = useToast();
   const db = useFirestore();
   const storage = useStorage();
@@ -39,22 +41,31 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
   const [textInput, setTextInput] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentMediaType, setCurrentMediaType] = useState<'image' | 'video' | 'audio' | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   const collaboratorIds = scrapbook?.collaboratorIds || [];
 
   const handleFinalize = () => {
     if (!scrapbook?.id) return;
     setIsFinalizing(true);
-    const scrapbookRef = doc(db, "scrapbooks", scrapbook.id);
-    updateDocumentNonBlocking(scrapbookRef, { isFinalized: true });
     
+    const scrapbookRef = doc(db, "scrapbooks", scrapbook.id);
+    
+    // Update state in Firestore
+    updateDocumentNonBlocking(scrapbookRef, { 
+      isFinalized: true,
+      updatedAt: serverTimestamp()
+    });
+    
+    // Feedback and navigation
     setTimeout(() => {
       setIsFinalizing(false);
       toast({
         title: "Design Finalized",
         description: "Your scrapbook design has been locked.",
       });
-    }, 1000);
+      router.push("/dashboard");
+    }, 800);
   };
 
   const handleMediaClick = (type: 'image' | 'video' | 'audio') => {
@@ -66,44 +77,68 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
     const file = e.target.files?.[0];
     if (!file || !user || !pageId) return;
 
-    toast({
-      title: `Uploading ${currentMediaType}...`,
-      description: "Please wait while we process your media.",
-    });
+    // Strict Mime Type Validation
+    const allowedImages = ['image/png', 'image/jpeg'];
+    const allowedVideos = ['video/mp4', 'video/quicktime'];
+    const allowedAudio = ['audio/mpeg', 'audio/wav', 'audio/m4a'];
 
+    if (currentMediaType === 'image' && !allowedImages.includes(file.type)) {
+      toast({ variant: "destructive", title: "Invalid format", description: "Only PNG and JPEG images are allowed." });
+      return;
+    }
+    if (currentMediaType === 'video' && !allowedVideos.includes(file.type)) {
+      toast({ variant: "destructive", title: "Invalid format", description: "Only MP4 and MOV videos are allowed." });
+      return;
+    }
+    if (currentMediaType === 'audio' && !allowedAudio.includes(file.type)) {
+      toast({ variant: "destructive", title: "Invalid format", description: "Only MP3, WAV, and M4A audio are allowed." });
+      return;
+    }
+
+    setUploadProgress(0);
+    
     try {
       const storageRef = ref(storage, `scrapbooks/${scrapbook.id}/pages/${pageId}/${Date.now()}_${file.name}`);
-      const uploadResult = await uploadBytes(storageRef, file);
-      const downloadUrl = await getDownloadURL(uploadResult.ref);
+      const uploadTask = uploadBytesResumable(storageRef, file);
 
-      const objectsCol = collection(db, "scrapbooks", scrapbook.id, "pages", pageId, "canvasObjects");
-      addDocumentNonBlocking(objectsCol, {
-        pageId,
-        type: currentMediaType,
-        mediaUri: downloadUrl,
-        members: scrapbook.members,
-        x: 100,
-        y: 100,
-        width: currentMediaType === 'audio' ? 300 : 200,
-        height: currentMediaType === 'audio' ? 60 : 200,
-        rotation: 0,
-        scaleX: 1,
-        scaleY: 1,
-        zIndex: 1,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(progress);
+        }, 
+        (error) => {
+          console.error("Upload error", error);
+          setUploadProgress(null);
+          toast({ variant: "destructive", title: "Upload Failed", description: "Could not upload media." });
+        }, 
+        async () => {
+          const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+          const objectsCol = collection(db, "scrapbooks", scrapbook.id, "pages", pageId, "canvasObjects");
+          
+          addDocumentNonBlocking(objectsCol, {
+            pageId,
+            type: currentMediaType,
+            mediaUri: downloadUrl,
+            members: scrapbook.members,
+            x: 100,
+            y: 100,
+            width: currentMediaType === 'audio' ? 300 : 250,
+            height: currentMediaType === 'audio' ? 80 : 250,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            zIndex: 1,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
 
-      toast({
-        title: "Success",
-        description: `${currentMediaType} added to your canvas.`,
-      });
+          setUploadProgress(null);
+          toast({ title: "Success", description: `${currentMediaType} added to your canvas.` });
+        }
+      );
     } catch (err) {
-      toast({
-        variant: "destructive",
-        title: "Upload Failed",
-        description: "Could not upload media. Please try again.",
-      });
+      setUploadProgress(null);
+      toast({ variant: "destructive", title: "Process Failed", description: "Something went wrong." });
     }
   };
 
@@ -118,8 +153,8 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
       members: scrapbook.members,
       x: 150,
       y: 150,
-      width: 200,
-      height: 60,
+      width: 250,
+      height: 80,
       rotation: 0,
       scaleX: 1,
       scaleY: 1,
@@ -130,73 +165,81 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
 
     setTextInput("");
     setIsTextDialogOpen(false);
-    toast({
-      title: "Text added",
-      description: "You can now drag it around your canvas.",
-    });
   };
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4">
-      <div className="flex items-center gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold font-headline">{scrapbook?.title}</h1>
-            {scrapbook?.isFinalized && <CheckCircle2 className="h-5 w-5 text-green-500" />}
+    <div className="flex flex-col gap-4">
+      {uploadProgress !== null && (
+        <div className="w-full space-y-2 px-1">
+          <div className="flex justify-between text-xs font-medium">
+            <span>Uploading {currentMediaType}...</span>
+            <span>{Math.round(uploadProgress)}%</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">{scrapbook?.category}</Badge>
-            {scrapbook?.isPublic ? <Badge variant="secondary">Public</Badge> : <Badge variant="secondary">Private</Badge>}
+          <Progress value={uploadProgress} className="h-2" />
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold font-headline">{scrapbook?.title}</h1>
+              {scrapbook?.isFinalized && <CheckCircle2 className="h-5 w-5 text-green-500" />}
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline">{scrapbook?.category}</Badge>
+              {scrapbook?.isPublic ? <Badge variant="secondary">Public</Badge> : <Badge variant="secondary">Private</Badge>}
+            </div>
           </div>
         </div>
-      </div>
-      
-      <div className="flex items-center gap-2">
-        <input
-          type="file"
-          ref={fileInputRef}
-          className="hidden"
-          accept={currentMediaType === 'image' ? 'image/*' : currentMediaType === 'video' ? 'video/*' : 'audio/*'}
-          onChange={onFileChange}
-        />
         
-        <Button variant="outline" size="sm" onClick={() => handleMediaClick('image')}>
-          <ImagePlus className="mr-2 h-4 w-4" />
-          Image
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => setIsTextDialogOpen(true)}>
-          <Type className="mr-2 h-4 w-4" />
-          Text
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => handleMediaClick('video')}>
-          <Video className="mr-2 h-4 w-4" />
-          Video
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => handleMediaClick('audio')}>
-          <Mic className="mr-2 h-4 w-4" />
-          Audio
-        </Button>
-        
-        <div className="h-6 border-l mx-2" />
-        
-        <div className="flex -space-x-2 mr-2">
-          {collaboratorIds.map((id: string, index: number) => (
-            <Avatar key={id} className="h-8 w-8 border-2 border-background">
-              <AvatarImage src={`https://picsum.photos/seed/30${index + 2}/40/40`} />
-              <AvatarFallback>U</AvatarFallback>
-            </Avatar>
-          ))}
+        <div className="flex items-center gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            accept={currentMediaType === 'image' ? 'image/png,image/jpeg' : currentMediaType === 'video' ? 'video/mp4,video/quicktime' : 'audio/*'}
+            onChange={onFileChange}
+          />
+          
+          <Button variant="outline" size="sm" onClick={() => handleMediaClick('image')} disabled={scrapbook?.isFinalized}>
+            <ImagePlus className="mr-2 h-4 w-4" />
+            Image
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setIsTextDialogOpen(true)} disabled={scrapbook?.isFinalized}>
+            <Type className="mr-2 h-4 w-4" />
+            Text
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => handleMediaClick('video')} disabled={scrapbook?.isFinalized}>
+            <Video className="mr-2 h-4 w-4" />
+            Video
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => handleMediaClick('audio')} disabled={scrapbook?.isFinalized}>
+            <Mic className="mr-2 h-4 w-4" />
+            Audio
+          </Button>
+          
+          <div className="h-6 border-l mx-2" />
+          
+          <div className="flex -space-x-2 mr-2">
+            {collaboratorIds.map((id: string, index: number) => (
+              <Avatar key={id} className="h-8 w-8 border-2 border-background">
+                <AvatarImage src={`https://picsum.photos/seed/30${index + 2}/40/40`} />
+                <AvatarFallback>U</AvatarFallback>
+              </Avatar>
+            ))}
+          </div>
+          
+          <Button variant="outline" size="sm" onClick={() => setIsShareOpen(true)}>
+            <Share2 className="mr-2 h-4 w-4" />
+            Share
+          </Button>
+          
+          <Button size="sm" onClick={handleFinalize} disabled={isFinalizing || scrapbook?.isFinalized}>
+            {isFinalizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+            {scrapbook?.isFinalized ? "Finalized" : "Finalize Design"}
+          </Button>
         </div>
-        
-        <Button variant="outline" size="sm" onClick={() => setIsShareOpen(true)}>
-          <Share2 className="mr-2 h-4 w-4" />
-          Share
-        </Button>
-        
-        <Button size="sm" onClick={handleFinalize} disabled={isFinalizing || scrapbook?.isFinalized}>
-          {isFinalizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-          {scrapbook?.isFinalized ? "Finalized" : "Finalize Design"}
-        </Button>
       </div>
 
       <CollaboratorDialog 

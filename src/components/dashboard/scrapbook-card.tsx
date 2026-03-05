@@ -1,6 +1,5 @@
 import Link from "next/link";
 import Image from "next/image";
-import type { Scrapbook } from "@/lib/data";
 import {
   Card,
   CardContent,
@@ -12,26 +11,40 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "../ui/button";
-import { MoreVertical } from "lucide-react";
+import { MoreVertical, CheckCircle2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
 
 interface ScrapbookCardProps {
-  scrapbook: Scrapbook;
+  scrapbook: any;
 }
 
 export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
   return (
-    <Card className="flex flex-col overflow-hidden h-full transform transition-transform duration-300 hover:scale-105 hover:shadow-xl">
+    <Card className="flex flex-col overflow-hidden h-full transform transition-transform duration-300 hover:scale-105 hover:shadow-xl relative">
+      {scrapbook.isFinalized && (
+        <div className="absolute top-2 right-2 z-10">
+          <Badge className="bg-green-500 text-white gap-1">
+            <CheckCircle2 className="h-3 w-3" />
+            Finalized
+          </Badge>
+        </div>
+      )}
       <Link href={`/editor?id=${scrapbook.id}`} className="flex-grow">
         <CardHeader className="p-0">
-          <div className="relative h-48 w-full">
-            <Image
-              src={scrapbook.coverImage}
-              alt={`Cover image for ${scrapbook.title}`}
-              fill
-              className="object-cover"
-              data-ai-hint="scrapbook cover"
-            />
+          <div className="relative h-48 w-full bg-muted">
+            {scrapbook.coverImage ? (
+              <Image
+                src={scrapbook.coverImage}
+                alt={`Cover image for ${scrapbook.title}`}
+                fill
+                className="object-cover"
+                data-ai-hint="scrapbook cover"
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+                No Cover Image
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-4 flex-grow">
@@ -40,22 +53,22 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
           </Badge>
           <CardTitle className="text-lg font-headline mb-1 leading-tight">{scrapbook.title}</CardTitle>
           <CardDescription className="text-sm">
-            {scrapbook.pages.length} pages
+            {scrapbook.isFinalized ? "Locked Design" : "Draft Canvas"}
           </CardDescription>
         </CardContent>
       </Link>
-      <CardFooter className="p-4 flex justify-between items-center">
+      <CardFooter className="p-4 flex justify-between items-center border-t mt-auto">
         <div className="flex -space-x-2">
-          {scrapbook.collaboratorIds.slice(0, 2).map((id, index) => (
-            <Avatar key={id} className="h-8 w-8 border-2 border-background">
-              <AvatarImage src={`https://picsum.photos/seed/30${index + 2}/40/40`} />
-              <AvatarFallback>U{index + 2}</AvatarFallback>
+          {Object.keys(scrapbook.members || {}).slice(0, 3).map((uid, index) => (
+            <Avatar key={uid} className="h-8 w-8 border-2 border-background">
+              <AvatarImage src={`https://picsum.photos/seed/${uid}/40/40`} />
+              <AvatarFallback>U</AvatarFallback>
             </Avatar>
           ))}
-          {scrapbook.collaboratorIds.length > 2 && (
+          {Object.keys(scrapbook.members || {}).length > 3 && (
             <Avatar className="h-8 w-8 border-2 border-background">
               <AvatarFallback>
-                +{scrapbook.collaboratorIds.length - 2}
+                +{Object.keys(scrapbook.members || {}).length - 3}
               </AvatarFallback>
             </Avatar>
           )}
@@ -67,7 +80,9 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-                <DropdownMenuItem>Edit</DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={`/editor?id=${scrapbook.id}`}>Open Editor</Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem>Share</DropdownMenuItem>
                 <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
             </DropdownMenuContent>
