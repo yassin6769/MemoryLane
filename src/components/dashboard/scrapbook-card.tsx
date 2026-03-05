@@ -147,9 +147,10 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem 
-                onSelect={(e) => {
-                  e.preventDefault();
-                  setIsShareOpen(true);
+                onSelect={() => {
+                  // Using a timeout prevents the Radix UI interaction lock-up bug
+                  // by allowing the dropdown to close before the dialog opens.
+                  setTimeout(() => setIsShareOpen(true), 100);
                 }} 
                 className="flex items-center gap-2"
               >
@@ -158,9 +159,9 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem 
-                onSelect={(e) => {
-                  e.preventDefault();
-                  setIsDeleteDialogOpen(true);
+                onSelect={() => {
+                  // Using a timeout prevents the Radix UI interaction lock-up bug
+                  setTimeout(() => setIsDeleteDialogOpen(true), 100);
                 }}
                 className="text-destructive focus:text-destructive flex items-center gap-2"
               >
