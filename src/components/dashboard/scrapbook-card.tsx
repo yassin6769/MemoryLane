@@ -146,13 +146,22 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
                   Open Editor
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setIsShareOpen(true)} className="flex items-center gap-2">
+              <DropdownMenuItem 
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setIsShareOpen(true);
+                }} 
+                className="flex items-center gap-2"
+              >
                 <Share2 className="h-4 w-4" />
                 Share & Privacy
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem 
-                onClick={() => setIsDeleteDialogOpen(true)}
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setIsDeleteDialogOpen(true);
+                }}
                 className="text-destructive focus:text-destructive flex items-center gap-2"
               >
                 <Trash2 className="h-4 w-4" />
