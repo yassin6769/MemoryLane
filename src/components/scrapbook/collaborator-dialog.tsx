@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { Share2, Copy, UserPlus, Globe, Lock, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
@@ -51,8 +52,6 @@ export function CollaboratorDialog({ scrapbook, open, onOpenChange }: Collaborat
       return;
     }
 
-    // In a real Android app, this might be a deep link like myapp://scrapbook/id
-    // Here we use the web URL as the shareable link.
     const url = `${window.location.origin}/editor?id=${scrapbookId}`;
     navigator.clipboard.writeText(url);
     
