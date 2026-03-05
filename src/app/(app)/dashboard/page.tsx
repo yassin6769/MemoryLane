@@ -1,22 +1,26 @@
+
 "use client";
 
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase";
 import ScrapbookCard from "@/components/dashboard/scrapbook-card";
 import { CreateScrapbookDialog } from "@/components/dashboard/create-scrapbook-dialog";
-import { collection, query, where, orderBy } from "firebase/firestore";
+import { collection, query, where } from "firebase/firestore";
 import { Loader2 } from "lucide-react";
 
 export default function Dashboard() {
   const db = useFirestore();
   const { user, isUserLoading } = useUser();
 
-  // Query scrapbooks where the current user is a member (owner, editor, or viewer)
+  /**
+   * Query scrapbooks where the current user is a member.
+   * NOTE: We removed orderBy("updatedAt") to avoid requiring dynamic composite indexes
+   * for every possible user ID, which is a Firestore limitation for map-key queries.
+   */
   const scrapbooksQuery = useMemoFirebase(() => {
     if (!user) return null;
     return query(
       collection(db, "scrapbooks"),
-      where(`members.${user.uid}`, "in", ["owner", "editor", "viewer"]),
-      orderBy("updatedAt", "desc")
+      where(`members.${user.uid}`, "in", ["owner", "editor", "viewer"])
     );
   }, [db, user]);
 

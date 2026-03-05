@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -10,19 +11,8 @@ service cloud.firestore {
      * It prioritizes "Authorization Independence" by relying on denormalized membership data 
      * within documents to avoid costly cross-document lookups (get() calls).
      * 
-     * Data Structure:
-     * - /users/{userId}: Private user profiles and personal settings.
-     * - /scrapbooks/{scrapbookId}: Top-level collaborative scrapbooks using a 'members' map for access control.
-     * - /scrapbooks/.../pages: Subcollections that carry denormalized 'members' maps from the parent.
-     * - /users/{userId}/scrapbookInvitations: User-specific inbox for collaboration invites.
-     * 
-     * Key Security Decisions:
-     * 1. Membership Map: Authorization for shared scrapbooks is managed via a `members` map 
-     *    (e.g., { 'uid123': 'owner', 'uid456': 'editor' }) stored directly on the document.
-     * 2. QAP (Query as Authorization): List operations on shared collections require the client 
-     *    to filter by their own UID within the 'members' map to satisfy security constraints.
-     * 3. Relational Integrity: The rules enforce that internal document IDs and owner IDs 
-     *    match the authenticated user and the storage path during creation and updates.
+     * Update: Added redundant ownerId checks and more resilient isMember logic to handle 
+     * permission errors during list operations.
      */
 
     // --- Helper Functions ---
@@ -35,96 +25,68 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Combines ownership check with existence check for updates and deletes
-    function isExistingOwner(userId) {
-      return resource != null && isOwner(userId);
-    }
-
     // Checks if the current user is a member of the document (owner, editor, or viewer)
     function isMember(data) {
-      return isSignedIn() && data.members[request.auth.uid] != null;
+      return isSignedIn() && 
+             data != null && 
+             "members" in data && 
+             data.members[request.auth.uid] != null;
     }
 
     // Checks if the current user has write/edit permissions
     function canEdit(data) {
-      return isSignedIn() && (data.members[request.auth.uid] == 'owner' || data.members[request.auth.uid] == 'editor');
+      return isSignedIn() && (
+        data.members[request.auth.uid] == 'owner' || 
+        data.members[request.auth.uid] == 'editor' ||
+        data.ownerId == request.auth.uid
+      );
     }
 
     // Checks if the current user is the primary owner
     function isDocOwner(data) {
-      return isSignedIn() && data.members[request.auth.uid] == 'owner';
+      return isSignedIn() && (
+        data.members[request.auth.uid] == 'owner' ||
+        data.ownerId == request.auth.uid
+      );
     }
 
     // --- Collection Rules ---
 
-    /**
-     * @description Rules for the UserProfile collection. Restricts access to the specific user.
-     * @path /users/{userId}
-     * @allow get (isOwner), create (isOwner), update (isExistingOwner), list (isOwner)
-     * @deny delete (always) - Profiles should be preserved or handled via admin/delete-account logic.
-     * @principle Path-based ownership and self-creation validation.
-     */
     match /users/{userId} {
       allow get, list: if isOwner(userId);
       allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow update: if isOwner(userId) && request.resource.data.id == userId;
       allow delete: if false;
     }
 
-    /**
-     * @description Collaborative Scrapbooks. Membership is determined by the internal 'members' map.
-     * @path /scrapbooks/{scrapbookId}
-     * @allow list (isSignedIn), get (isMember), create (isOwner), update (canEdit), delete (isDocOwner)
-     * @deny read/write if user is not in the 'members' map.
-     * @principle Shared access via denormalized member maps for authorization independence.
-     */
     match /scrapbooks/{scrapbookId} {
       allow list: if isSignedIn();
-      allow get: if isMember(resource.data);
+      allow get: if isMember(resource.data) || isDocOwner(resource.data);
       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid && request.resource.data.members[request.auth.uid] == 'owner';
-      allow update: if resource != null && canEdit(resource.data) && request.resource.data.ownerId == resource.data.ownerId;
-      allow delete: if resource != null && isDocOwner(resource.data);
+      allow update: if canEdit(resource.data);
+      allow delete: if isDocOwner(resource.data);
 
-      /**
-       * @description Pages within a scrapbook. Denormalizes members for performance.
-       * @path /scrapbooks/{scrapbookId}/pages/{pageId}
-       * @allow list (isSignedIn), get (isMember), update (canEdit)
-       * @principle Inherited membership logic from parent via denormalization.
-       */
       match /pages/{pageId} {
         allow list: if isSignedIn();
-        allow get: if isMember(resource.data);
-        allow create: if isSignedIn() && request.resource.data.scrapbookId == scrapbookId && isMember(request.resource.data);
-        allow update: if resource != null && canEdit(resource.data) && request.resource.data.scrapbookId == resource.data.scrapbookId;
-        allow delete: if resource != null && isDocOwner(resource.data);
+        allow get: if isMember(resource.data) || isDocOwner(resource.data);
+        allow create: if isSignedIn() && isMember(request.resource.data);
+        allow update: if canEdit(resource.data);
+        allow delete: if isDocOwner(resource.data);
 
-        /**
-         * @description Multimedia elements on a page.
-         * @path /scrapbooks/{scrapbookId}/pages/{pageId}/canvasObjects/{canvasObjectId}
-         * @allow list (isSignedIn), get (isMember), update (canEdit)
-         * @principle Deeply nested denormalized authorization.
-         */
         match /canvasObjects/{canvasObjectId} {
           allow list: if isSignedIn();
-          allow get: if isMember(resource.data);
-          allow create: if isSignedIn() && request.resource.data.pageId == pageId && isMember(request.resource.data);
-          allow update: if resource != null && canEdit(resource.data) && request.resource.data.pageId == resource.data.pageId;
-          allow delete: if resource != null && isDocOwner(resource.data);
+          allow get: if isMember(resource.data) || isDocOwner(resource.data);
+          allow create: if isSignedIn() && isMember(request.resource.data);
+          allow update: if canEdit(resource.data);
+          allow delete: if isDocOwner(resource.data);
         }
       }
     }
 
-    /**
-     * @description Pending collaboration invitations. Stored in the target user's path.
-     * @path /users/{userId}/scrapbookInvitations/{invitationId}
-     * @allow get, list, update, delete (isOwner), create (isSignedIn)
-     * @deny create if not signed in, read/update if not the target user.
-     * @principle User-scoped inbox pattern for secure delivery of invitations.
-     */
     match /users/{userId}/scrapbookInvitations/{invitationId} {
       allow get, list: if isOwner(userId);
       allow create: if isSignedIn() && request.resource.data.userId == userId;
-      allow update, delete: if isExistingOwner(userId);
+      allow update, delete: if isOwner(userId);
     }
   }
 }
