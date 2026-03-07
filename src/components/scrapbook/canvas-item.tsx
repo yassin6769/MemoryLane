@@ -56,20 +56,20 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
   const { toast } = useToast();
 
   /**
-   * UNIFIED TOUCH/MOUSE DOWN HANDLER
-   * Implements gesture priority based on target element.
+   * UNIFIED GESTURE HANDLER
+   * Determines mode based on the target handle or body.
    */
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>, mode: InteractionMode = 'drag') => {
-    // Priority: Don't trigger drag if we clicked a specific action button (Flip/Trash)
-    if ((e.target as HTMLElement).closest('.action-button')) return;
-
+    // Stop event propagation to prevent multiple items from being selected/moved
     e.stopPropagation();
-    e.preventDefault();
+    
+    // Check if we clicked an action button within the overlay
+    if ((e.target as HTMLElement).closest('.action-button')) return;
 
     setInteractionMode(mode);
     hasMoved.current = false;
 
-    // Calculate center for rotation/resize reference
+    // Calculate center for rotation reference
     const rect = itemRef.current?.getBoundingClientRect();
     const centerX = rect ? rect.left + rect.width / 2 : 0;
     const centerY = rect ? rect.top + rect.height / 2 : 0;
@@ -90,8 +90,8 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
   };
 
   /**
-   * REAL-TIME UI UPDATES (60FPS)
-   * Updates local CSS directly for responsiveness.
+   * HIGH-PERFORMANCE LOCAL UPDATES
+   * Direct DOM manipulation of the element's style for 60fps interaction.
    */
   const handleMouseMove = (e: globalThis.MouseEvent) => {
     if (!interactionMode) return;
@@ -101,19 +101,16 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     const dy = e.clientY - interactionStart.current.clientY;
 
     if (interactionMode === 'drag') {
-      // Direct UI update for zero lag
+      const newX = interactionStart.current.x + dx;
+      const newY = interactionStart.current.y + dy;
       if (itemRef.current) {
-        const newX = interactionStart.current.x + dx;
-        const newY = interactionStart.current.y + dy;
         itemRef.current.style.left = `${newX}px`;
         itemRef.current.style.top = `${newY}px`;
-        // Also notify parent for logical state (optional: could wait for mouseUp)
-        onUpdatePosition(item.id, newX, newY);
       }
     } 
     else if (interactionMode === 'resize') {
       const newWidth = Math.max(50, interactionStart.current.width + dx);
-      // For images/videos, maintain aspect ratio
+      // Maintain aspect ratio for media
       const newHeight = (item.type === 'video' || item.type === 'image')
         ? (newWidth * interactionStart.current.height) / interactionStart.current.width
         : Math.max(30, interactionStart.current.height + dy);
@@ -138,8 +135,8 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
   };
 
   /**
-   * STATE PERSISTENCE (ACTION_UP)
-   * Saves final transformation to Firestore.
+   * FIRESTORE PERSISTENCE
+   * Sync final state to the database only when the user releases the object.
    */
   const handleMouseUp = (e: globalThis.MouseEvent) => {
     const finalMode = interactionMode;
@@ -147,6 +144,7 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     window.removeEventListener("mousemove", handleMouseMove);
     window.removeEventListener("mouseup", handleMouseUp);
 
+    // If no movement happened, it's a selection toggle
     if (!hasMoved.current) {
       setIsSelected(!isSelected);
       return;
@@ -161,6 +159,8 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     if (finalMode === 'drag') {
       updates.x = interactionStart.current.x + dx;
       updates.y = interactionStart.current.y + dy;
+      // Sync parent state for immediate re-render if necessary
+      onUpdatePosition(item.id, updates.x, updates.y);
     } 
     else if (finalMode === 'resize') {
       updates.width = Math.max(50, interactionStart.current.width + dx);
@@ -177,17 +177,17 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
       updates.rotation = interactionStart.current.rotation + rotationDiff;
     }
 
-    // Single non-blocking write to persist the final transformation
     updateDocumentNonBlocking(docRef, updates);
   };
 
-  const handleFlip = () => {
+  const handleFlip = (e: React.MouseEvent) => {
+    e.stopPropagation();
     const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", item.id);
     updateDocumentNonBlocking(docRef, {
       scaleX: (item.scaleX || 1) * -1,
       updatedAt: serverTimestamp()
     });
-    toast({ title: "Image Flipped" });
+    toast({ title: "Memory Flipped" });
   };
 
   const handleDelete = async () => {
@@ -197,11 +197,11 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
         try {
           const storageRef = ref(storage, item.mediaUri);
           await deleteObject(storageRef);
-        } catch (sErr) { console.warn("Storage cleanup failed:", sErr); }
+        } catch (sErr) { console.warn("Storage cleanup skipped:", sErr); }
       }
       const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", item.id);
       deleteDocumentNonBlocking(docRef);
-      toast({ title: "Item Deleted" });
+      toast({ title: "Item Removed" });
     } catch (error) {
       toast({ variant: "destructive", title: "Deletion Failed" });
     } finally {
@@ -214,7 +214,7 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     switch (item.type) {
       case "image":
         return (
-          <div className="relative w-full h-full overflow-hidden rounded-sm bg-muted/20 shadow-sm border border-white/50 pointer-events-none">
+          <div className="relative w-full h-full overflow-hidden rounded-sm bg-muted/20 shadow-sm border border-white/50 pointer-events-none select-none">
             <Image
               src={item.mediaUri}
               alt="Memory"
@@ -262,10 +262,10 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
         ref={itemRef}
         onMouseDown={(e) => handleMouseDown(e, 'drag')}
         className={cn(
-          "absolute transition-shadow duration-300 transform-gpu",
-          interactionMode === 'drag' ? "cursor-grabbing shadow-2xl ring-2 ring-primary scale-105 z-[9999]" : "cursor-grab shadow-md hover:shadow-lg",
+          "absolute transition-shadow duration-300 transform-gpu select-none",
+          interactionMode === 'drag' ? "cursor-grabbing shadow-2xl scale-[1.02] z-[9999]" : "cursor-grab shadow-md hover:shadow-lg",
           isSelected ? "ring-2 ring-primary ring-offset-2 z-[999]" : "",
-          item.type === "text" ? "bg-transparent" : "bg-white p-2 border border-muted/30"
+          item.type === "text" ? "bg-transparent" : "bg-white p-2 border border-muted/30 rounded-sm"
         )}
         style={{
           left: `${item.x}px`,
@@ -274,12 +274,12 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
           height: `${item.height}px`,
           transform: `rotate(${item.rotation || 0}deg) scaleX(${item.scaleX || 1}) scaleY(${item.scaleY || 1})`,
           transformOrigin: 'center center',
-          zIndex: interactionMode === 'drag' ? 9999 : (item.zIndex || 1),
+          zIndex: interactionMode ? 9999 : (item.zIndex || 1),
         }}
       >
         {renderContent()}
 
-        {/* TRANSFORMATION HANDLES */}
+        {/* TRANSFORMATION OVERLAY (Visible on selection) */}
         {isSelected && (
           <>
             {/* ROTATION HANDLE (TOP) */}
@@ -288,20 +288,20 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
               className="absolute -top-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 cursor-alias group z-[100]"
             >
               <div className="w-0.5 h-6 bg-primary" />
-              <Button size="icon" variant="outline" className="h-8 w-8 rounded-full border-primary bg-white shadow-md action-button">
-                <RotateCcw className="h-4 w-4 text-primary" />
+              <Button size="icon" variant="outline" className="h-8 w-8 rounded-full border-primary bg-white shadow-md action-button hover:bg-primary hover:text-white transition-colors">
+                <RotateCcw className="h-4 w-4" />
               </Button>
             </div>
 
             {/* RESIZE HANDLE (BOTTOM RIGHT) */}
             <div 
               onMouseDown={(e) => handleMouseDown(e, 'resize')}
-              className="absolute -bottom-2 -right-2 h-7 w-7 bg-white border-2 border-primary rounded-sm cursor-nwse-resize shadow-sm z-[100] flex items-center justify-center active:bg-primary group"
+              className="absolute -bottom-2 -right-2 h-7 w-7 bg-white border-2 border-primary rounded-sm cursor-nwse-resize shadow-sm z-[100] flex items-center justify-center active:bg-primary group transition-colors"
             >
               <Maximize2 className="h-4 w-4 text-primary group-active:text-white" />
             </div>
 
-            {/* CONTEXT MENU (BOTTOM) */}
+            {/* QUICK ACTIONS (BOTTOM) */}
             <div className="absolute -bottom-14 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-white/95 backdrop-blur-md border p-1 rounded-full shadow-xl action-button z-[101]">
               <Button 
                 variant="ghost" 
@@ -317,8 +317,8 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
                 variant="ghost" 
                 size="icon" 
                 className="h-9 w-9 rounded-full text-destructive hover:bg-destructive/10"
-                onClick={() => setIsDeleteDialogOpen(true)}
-                title="Delete Memory"
+                onClick={(e) => { e.stopPropagation(); setIsDeleteDialogOpen(true); }}
+                title="Remove Memory"
               >
                 <Trash2 className="h-5 w-5" />
               </Button>
@@ -327,15 +327,16 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
         )}
       </div>
 
+      {/* DELETION CONFIRMATION */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
-              Delete this memory?
+              Remove this memory?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove this {item.type} from your scrapbook page.
+              This item will be permanently deleted from your scrapbook page.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -345,7 +346,7 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={isDeleting}
             >
-              {isDeleting ? "Deleting..." : "Delete Permanently"}
+              {isDeleting ? "Removing..." : "Delete Permanently"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
