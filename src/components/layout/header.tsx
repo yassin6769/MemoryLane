@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
-import { Home, Menu, Search, Settings, Users } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Home, Menu, Search, Settings, Users, Library } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 import {
   DropdownMenu,
@@ -16,6 +20,8 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "../icons/logo";
 
 export default function AppHeader() {
+  const pathname = usePathname();
+
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
       <Sheet>
@@ -36,21 +42,30 @@ export default function AppHeader() {
             </Link>
             <Link
               href="/dashboard"
-              className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
+              className={cn(
+                "flex items-center gap-4 px-2.5 transition-colors",
+                pathname === "/dashboard" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
             >
-              <Home className="h-5 w-5" />
-              Dashboard
+              <Library className="h-5 w-5" />
+              My Scrapbooks
             </Link>
             <Link
               href="#"
-              className="flex items-center gap-4 px-2.5 text-foreground"
+              className={cn(
+                "flex items-center gap-4 px-2.5 transition-colors",
+                pathname === "/shared" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
             >
               <Users className="h-5 w-5" />
               Shared with me
             </Link>
             <Link
               href="/settings"
-              className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
+              className={cn(
+                "flex items-center gap-4 px-2.5 transition-colors",
+                pathname === "/settings" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
             >
               <Settings className="h-5 w-5" />
               Settings
@@ -87,7 +102,9 @@ export default function AppHeader() {
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>My Account</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>Settings</DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/settings">Settings</Link>
+          </DropdownMenuItem>
           <DropdownMenuItem>Support</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
