@@ -11,8 +11,9 @@ service cloud.firestore {
      * It prioritizes "Authorization Independence" by relying on denormalized membership data 
      * within documents to avoid costly cross-document lookups (get() calls).
      * 
-     * Update: Added redundant ownerId checks and more resilient isMember logic to handle 
-     * permission errors during list operations.
+     * Updates: 
+     * - Added support for 'isPublic' visibility on scrapbooks.
+     * - Improved 'get' rules to handle non-existent documents gracefully.
      */
 
     // --- Helper Functions ---
@@ -50,6 +51,11 @@ service cloud.firestore {
       );
     }
 
+    // Checks if a scrapbook or its parent is public
+    function isPublic(data) {
+      return data != null && data.isPublic == true;
+    }
+
     // --- Collection Rules ---
 
     match /users/{userId} {
@@ -61,21 +67,23 @@ service cloud.firestore {
 
     match /scrapbooks/{scrapbookId} {
       allow list: if isSignedIn();
-      allow get: if isMember(resource.data) || isDocOwner(resource.data);
+      // Allow get if the document doesn't exist (returns null), if it's public, or if the user is a member/owner
+      allow get: if isSignedIn() && (resource == null || isPublic(resource.data) || isMember(resource.data) || isDocOwner(resource.data));
       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid && request.resource.data.members[request.auth.uid] == 'owner';
       allow update: if canEdit(resource.data);
       allow delete: if isDocOwner(resource.data);
 
       match /pages/{pageId} {
         allow list: if isSignedIn();
-        allow get: if isMember(resource.data) || isDocOwner(resource.data);
+        // Pages inherit visibility from their parent scrapbook via the 'get' helper or denormalized members
+        allow get: if isSignedIn() && (resource == null || isMember(resource.data) || isDocOwner(resource.data) || get(/databases/$(database)/documents/scrapbooks/$(scrapbookId)).data.isPublic == true);
         allow create: if isSignedIn() && isMember(request.resource.data);
         allow update: if canEdit(resource.data);
         allow delete: if isDocOwner(resource.data);
 
         match /canvasObjects/{canvasObjectId} {
           allow list: if isSignedIn();
-          allow get: if isMember(resource.data) || isDocOwner(resource.data);
+          allow get: if isSignedIn() && (resource == null || isMember(resource.data) || isDocOwner(resource.data) || get(/databases/$(database)/documents/scrapbooks/$(scrapbookId)).data.isPublic == true);
           allow create: if isSignedIn() && isMember(request.resource.data);
           allow update: if canEdit(resource.data);
           allow delete: if isDocOwner(resource.data);
