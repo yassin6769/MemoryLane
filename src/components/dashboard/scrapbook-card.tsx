@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -14,7 +15,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "../ui/button";
-import { MoreVertical, CheckCircle2, Trash2, Share2, ExternalLink, AlertTriangle } from "lucide-react";
+import { MoreVertical, CheckCircle2, Trash2, Share2, ExternalLink, AlertTriangle, FileText } from "lucide-react";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -105,6 +106,10 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
               <Badge variant="secondary" className="font-medium px-2.5 py-0.5 bg-primary/10 text-primary border-none">
                 {scrapbook.category}
               </Badge>
+              <Badge variant="outline" className="gap-1 px-2.5 py-0.5 text-muted-foreground border-muted/50">
+                <FileText className="h-3 w-3" />
+                {scrapbook.pageCount || 0} {scrapbook.pageCount === 1 ? 'Page' : 'Pages'}
+              </Badge>
               {scrapbook.isPublic && (
                 <Badge variant="outline" className="text-[10px] uppercase tracking-wider text-muted-foreground">
                   Public
@@ -147,9 +152,8 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem 
-                onSelect={() => {
-                  // Using a timeout prevents the Radix UI interaction lock-up bug
-                  // by allowing the dropdown to close before the dialog opens.
+                onSelect={(e) => {
+                  e.preventDefault();
                   setTimeout(() => setIsShareOpen(true), 100);
                 }} 
                 className="flex items-center gap-2"
@@ -159,8 +163,8 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem 
-                onSelect={() => {
-                  // Using a timeout prevents the Radix UI interaction lock-up bug
+                onSelect={(e) => {
+                  e.preventDefault();
                   setTimeout(() => setIsDeleteDialogOpen(true), 100);
                 }}
                 className="text-destructive focus:text-destructive flex items-center gap-2"

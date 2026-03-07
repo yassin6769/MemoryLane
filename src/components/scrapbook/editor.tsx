@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
@@ -5,7 +6,7 @@ import { Canvas } from "@/components/scrapbook/canvas";
 import { Toolbar } from "@/components/scrapbook/toolbar";
 import { PagePagination } from "@/components/scrapbook/page-pagination";
 import { useState, useEffect } from "react";
-import { collection, doc, query, orderBy, setDoc, serverTimestamp, addDoc } from "firebase/firestore";
+import { collection, doc, query, orderBy, setDoc, serverTimestamp, addDoc, updateDoc, increment } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,7 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
       const pagesCol = collection(db, "scrapbooks", scrapbook.id, "pages");
       const newPageId = "page_" + Date.now();
       const newPageRef = doc(pagesCol, newPageId);
+      const scrapbookRef = doc(db, "scrapbooks", scrapbook.id);
       
       setDoc(newPageRef, {
         id: newPageId,
@@ -50,6 +52,12 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
         members: scrapbook.members,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+      });
+
+      // Update parent scrapbook metadata
+      updateDoc(scrapbookRef, {
+        pageCount: 1,
+        updatedAt: serverTimestamp()
       });
     }
   }, [pages, isPagesLoading, db, scrapbook.id, scrapbook.members]);
@@ -106,6 +114,7 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
 
     try {
       const pagesCol = collection(db, "scrapbooks", scrapbook.id, "pages");
+      const scrapbookRef = doc(db, "scrapbooks", scrapbook.id);
       
       const nextNumber = pages && pages.length > 0 
         ? Math.max(...pages.map(p => p.pageNumber)) + 1 
@@ -121,6 +130,12 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
 
       const docRef = await addDoc(pagesCol, newPageData);
       await setDoc(docRef, { ...newPageData, id: docRef.id }, { merge: true });
+
+      // Atomically increment the total page count
+      updateDoc(scrapbookRef, {
+        pageCount: increment(1),
+        updatedAt: serverTimestamp()
+      });
 
       toast({
         title: "Page Added",

@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -7,9 +8,6 @@ import {
   addDoc,
   doc,
   deleteDoc,
-  writeBatch,
-  getDocs,
-  query,
 } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -36,6 +34,7 @@ export async function createScrapbook(
     pageIds: [],
     collaboratorPermissionIds: [],
     collaboratorIds: [],
+    pageCount: 0, // Initialize page count
     members: {
       [user.uid]: 'owner',
     },
@@ -62,14 +61,11 @@ export async function createScrapbook(
 /**
  * Deletes a scrapbook and attempts to clean up its main document.
  * In a client-side prototype, we primarily delete the top-level document.
- * Deep deletion of subcollections is best handled by Firebase Extensions or Cloud Functions.
  */
 export async function deleteScrapbook(firestore: Firestore, scrapbookId: string): Promise<void> {
   const docRef = doc(firestore, 'scrapbooks', scrapbookId);
   
   try {
-    // For this prototype, we delete the main document. 
-    // Security rules will prevent unauthorized deletions.
     await deleteDoc(docRef);
   } catch (error) {
     const permissionError = new FirestorePermissionError({

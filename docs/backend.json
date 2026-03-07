@@ -26,6 +26,7 @@
         "title": { "type": "string" },
         "ownerId": { "type": "string", "description": "UID of the owner." },
         "category": { "type": "string", "enum": ["Holiday", "Birthday", "Family", "Wedding", "Other"] },
+        "pageCount": { "type": "number", "description": "Total number of pages in the scrapbook." },
         "members": { 
           "type": "object", 
           "description": "Map of UID to role: 'owner', 'editor', or 'viewer'.",
