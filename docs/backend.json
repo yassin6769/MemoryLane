@@ -5,103 +5,39 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "UserProfile",
       "type": "object",
-      "description": "Represents a user's profile and personal settings within the MemoryLane application. This entity stores metadata about the user, but not authentication credentials.",
+      "description": "Represents a user's profile and personal settings within the MemoryLane application.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the UserProfile entity. This typically corresponds to the Firebase Authentication UID."
-        },
-        "email": {
-          "type": "string",
-          "description": "The user's email address, used for display and potentially communication (not for authentication system data).",
-          "format": "email"
-        },
-        "displayName": {
-          "type": "string",
-          "description": "The user's chosen display name."
-        },
-        "profileImageUrl": {
-          "type": "string",
-          "description": "Optional URI to the user's profile image stored in Firebase Storage.",
-          "format": "uri"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp indicating when the user profile was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp indicating when the user profile was last updated.",
-          "format": "date-time"
-        }
+        "id": { "type": "string", "description": "Firebase Authentication UID." },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "profileImageUrl": { "type": "string", "format": "uri" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "id",
-        "email",
-        "displayName",
-        "createdAt",
-        "updatedAt"
-      ]
+      "required": ["id", "email", "displayName", "createdAt", "updatedAt"]
     },
     "Scrapbook": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Scrapbook",
       "type": "object",
-      "description": "Represents a digital scrapbook, containing metadata and references to its pages and collaborators.",
+      "description": "Represents a digital scrapbook containing pages and collaborators.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Scrapbook entity."
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "ownerId": { "type": "string", "description": "UID of the owner." },
+        "category": { "type": "string", "enum": ["Holiday", "Birthday", "Family", "Wedding", "Other"] },
+        "members": { 
+          "type": "object", 
+          "description": "Map of UID to role: 'owner', 'editor', or 'viewer'.",
+          "additionalProperties": { "type": "string" }
         },
-        "title": {
-          "type": "string",
-          "description": "The title of the scrapbook."
-        },
-        "description": {
-          "type": "string",
-          "description": "An optional brief description of the scrapbook's content or theme."
-        },
-        "ownerId": {
-          "type": "string",
-          "description": "Reference to the UserProfile who created and primarily owns this scrapbook."
-        },
-        "category": {
-          "type": "string",
-          "description": "The thematic category of the scrapbook (e.g., 'Holiday', 'Birthday', 'Travel', 'Family')."
-        },
-        "members": {
-          "type": "object",
-          "description": "A map of user IDs to their roles (owner, editor, viewer).",
-          "additionalProperties": {
-            "type": "string",
-            "enum": ["owner", "editor", "viewer"]
-          }
-        },
-        "isFinalized": {
-          "type": "boolean",
-          "description": "Flag indicating if the scrapbook design is locked."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp indicating when the scrapbook was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp indicating when the scrapbook was last updated.",
-          "format": "date-time"
-        }
+        "isFinalized": { "type": "boolean" },
+        "isPublic": { "type": "boolean" },
+        "coverImage": { "type": "string", "format": "uri" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "id",
-        "title",
-        "ownerId",
-        "category",
-        "members",
-        "createdAt",
-        "updatedAt"
-      ]
+      "required": ["id", "title", "ownerId", "category", "members", "createdAt", "updatedAt"]
     },
     "Page": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -109,100 +45,43 @@
       "type": "object",
       "description": "Represents a single page within a scrapbook.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Page entity."
-        },
-        "scrapbookId": {
-          "type": "string",
-          "description": "Reference to the parent Scrapbook entity."
-        },
-        "pageNumber": {
-          "type": "number",
-          "description": "The sequential order of the page."
-        },
-        "members": {
-          "type": "object",
-          "description": "Denormalized membership map from the parent scrapbook."
-        }
+        "id": { "type": "string" },
+        "scrapbookId": { "type": "string" },
+        "pageNumber": { "type": "number" },
+        "members": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "id",
-        "scrapbookId",
-        "pageNumber",
-        "members"
-      ]
+      "required": ["id", "scrapbookId", "pageNumber", "members"]
     },
     "CanvasObject": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "CanvasObject",
       "type": "object",
-      "description": "Represents a single multimedia element on a scrapbook page.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the CanvasObject entity."
-        },
-        "pageId": {
-          "type": "string",
-          "description": "Reference to the parent Page entity."
-        },
-        "type": {
-          "type": "string",
-          "enum": ["image", "video", "audio", "text"]
-        },
-        "mediaUri": {
-          "type": "string",
-          "format": "uri"
-        },
-        "text": {
-          "type": "string"
-        },
-        "x": { "type": "number" },
-        "y": { "type": "number" },
-        "rotation": { "type": "number" },
-        "zIndex": { "type": "number" },
-        "members": {
-          "type": "object",
-          "description": "Denormalized membership map."
-        }
-      },
-      "required": [
-        "id",
-        "pageId",
-        "type",
-        "x",
-        "y",
-        "zIndex",
-        "members"
-      ]
-    },
-    "ScrapbookPermission": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "ScrapbookPermission",
-      "type": "object",
-      "description": "Manages collaboration invitations.",
+      "description": "A multimedia element on a page.",
       "properties": {
         "id": { "type": "string" },
-        "scrapbookId": { "type": "string" },
-        "userId": { "type": "string" },
-        "permissionLevel": { "type": "string" },
-        "invitedAt": { "type": "string", "format": "date-time" }
+        "pageId": { "type": "string" },
+        "type": { "type": "string", "enum": ["image", "video", "audio", "text"] },
+        "mediaUri": { "type": "string", "format": "uri" },
+        "text": { "type": "string" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" },
+        "rotation": { "type": "number" },
+        "scaleX": { "type": "number" },
+        "scaleY": { "type": "number" },
+        "zIndex": { "type": "number" },
+        "members": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "id",
-        "scrapbookId",
-        "userId",
-        "permissionLevel",
-        "invitedAt"
-      ]
+      "required": ["id", "pageId", "type", "x", "y", "members"]
     }
   },
   "auth": {
-    "providers": [
-      "password",
-      "anonymous"
-    ]
+    "providers": ["password", "anonymous"]
   },
   "firestore": {
     "structure": [
@@ -210,50 +89,32 @@
         "path": "/users/{userId}",
         "definition": {
           "entityName": "UserProfile",
-          "schema": {
-            "$ref": "#/backend/entities/UserProfile"
-          },
-          "description": "Stores individual user profiles."
+          "schema": { "$ref": "#/backend/entities/UserProfile" },
+          "description": "User profile documents."
         }
       },
       {
         "path": "/scrapbooks/{scrapbookId}",
         "definition": {
           "entityName": "Scrapbook",
-          "schema": {
-            "$ref": "#/backend/entities/Scrapbook"
-          },
-          "description": "Top-level collection for collaborative scrapbooks."
+          "schema": { "$ref": "#/backend/entities/Scrapbook" },
+          "description": "Collaborative scrapbooks."
         }
       },
       {
         "path": "/scrapbooks/{scrapbookId}/pages/{pageId}",
         "definition": {
           "entityName": "Page",
-          "schema": {
-            "$ref": "#/backend/entities/Page"
-          },
-          "description": "Pages belonging to a scrapbook."
+          "schema": { "$ref": "#/backend/entities/Page" },
+          "description": "Pages in a scrapbook."
         }
       },
       {
         "path": "/scrapbooks/{scrapbookId}/pages/{pageId}/canvasObjects/{canvasObjectId}",
         "definition": {
           "entityName": "CanvasObject",
-          "schema": {
-            "$ref": "#/backend/entities/CanvasObject"
-          },
-          "description": "Multimedia objects on a page."
-        }
-      },
-      {
-        "path": "/users/{userId}/scrapbookInvitations/{invitationId}",
-        "definition": {
-          "entityName": "ScrapbookPermission",
-          "schema": {
-            "$ref": "#/backend/entities/ScrapbookPermission"
-          },
-          "description": "Pending invitations for a user."
+          "schema": { "$ref": "#/backend/entities/CanvasObject" },
+          "description": "Objects on a page canvas."
         }
       }
     ]
