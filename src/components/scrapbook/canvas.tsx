@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import type { CanvasItem as CanvasItemType } from "@/lib/data";
 import { CanvasItem } from "./canvas-item";
 import { Button } from "@/components/ui/button";
 import { Trash2, AlertTriangle } from "lucide-react";
@@ -19,15 +17,17 @@ import {
 import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { doc, getFirestore } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface CanvasProps {
   scrapbookId: string;
   pageId: string;
   items: any[];
   onUpdateItemPosition: (id: string, x: number, y: number) => void;
+  className?: string;
 }
 
-export function Canvas({ scrapbookId, pageId, items, onUpdateItemPosition }: CanvasProps) {
+export function Canvas({ scrapbookId, pageId, items, onUpdateItemPosition, className }: CanvasProps) {
   const { toast } = useToast();
   const db = getFirestore();
 
@@ -43,9 +43,9 @@ export function Canvas({ scrapbookId, pageId, items, onUpdateItemPosition }: Can
   };
 
   return (
-    <div className="flex flex-col gap-4 h-full">
+    <div className={cn("flex flex-col gap-4 h-full preserve-3d backface-hidden", className)}>
       <div
-        className="relative w-full h-[70vh] rounded-lg overflow-hidden border bg-white shadow-inner"
+        className="relative w-full h-[70vh] rounded-lg overflow-hidden border bg-white shadow-inner preserve-3d"
         style={{
           backgroundImage:
             "radial-gradient(circle at 1px 1px, hsl(var(--border)) 1px, transparent 0)",
