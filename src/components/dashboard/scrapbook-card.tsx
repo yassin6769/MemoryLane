@@ -3,7 +3,7 @@
 
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -50,6 +50,15 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  // Robust fix for Radix UI body lock: ensure pointer events are restored 
+  // if any modal state changes or if the menu closes.
+  useEffect(() => {
+    if (!isMenuOpen && !isDeleteDialogOpen && !isShareOpen) {
+      document.body.style.pointerEvents = "auto";
+    }
+  }, [isMenuOpen, isDeleteDialogOpen, isShareOpen]);
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -150,7 +159,7 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
             )}
           </div>
 
-          <DropdownMenu>
+          <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-muted/50">
                 <MoreVertical className="h-4.5 w-4.5 text-muted-foreground" />
@@ -164,6 +173,7 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
               <DropdownMenuItem 
                 onSelect={(e) => {
                   e.preventDefault();
+                  setIsMenuOpen(false);
                   handleCardClick();
                 }} 
                 className="flex items-center gap-2"
@@ -174,7 +184,9 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
               <DropdownMenuItem 
                 onSelect={(e) => {
                   e.preventDefault();
-                  setTimeout(() => setIsShareOpen(true), 100);
+                  setIsMenuOpen(false);
+                  // Use a slightly longer timeout to ensure menu is fully closed and body lock is potentially cleared
+                  setTimeout(() => setIsShareOpen(true), 200);
                 }} 
                 className="flex items-center gap-2"
               >
@@ -185,7 +197,8 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
               <DropdownMenuItem 
                 onSelect={(e) => {
                   e.preventDefault();
-                  setTimeout(() => setIsDeleteDialogOpen(true), 100);
+                  setIsMenuOpen(false);
+                  setTimeout(() => setIsDeleteDialogOpen(true), 200);
                 }}
                 className="text-destructive focus:text-destructive flex items-center gap-2"
               >
@@ -197,38 +210,43 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
         </CardFooter>
       </Card>
 
-      <CollaboratorDialog 
-        scrapbook={scrapbook} 
-        open={isShareOpen} 
-        onOpenChange={setIsShareOpen} 
-      />
+      {/* Render Dialogs outside the Card to avoid parent transition/transform issues */}
+      {isShareOpen && (
+        <CollaboratorDialog 
+          scrapbook={scrapbook} 
+          open={isShareOpen} 
+          onOpenChange={setIsShareOpen} 
+        />
+      )}
 
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              Delete this Scrapbook?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete <strong>"{scrapbook.title}"</strong>? This will permanently remove all pages and media. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={(e) => {
-                e.preventDefault();
-                handleDelete();
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={isDeleting}
-            >
-              {isDeleting ? "Deleting..." : "Delete Permanently"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {isDeleteDialogOpen && (
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+                Delete this Scrapbook?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete <strong>"{scrapbook.title}"</strong>? This will permanently remove all pages and media. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDelete();
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Delete Permanently"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </>
   );
 }
