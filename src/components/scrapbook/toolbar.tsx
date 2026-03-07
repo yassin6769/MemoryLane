@@ -10,6 +10,8 @@ import {
   Video,
   CheckCircle2,
   Loader2,
+  ChevronLeft,
+  AlertTriangle,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
@@ -23,6 +25,16 @@ import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { CollaboratorDialog } from "./collaborator-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface ToolbarProps {
   scrapbook: any;
@@ -38,12 +50,26 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isTextDialogOpen, setIsTextDialogOpen] = useState(false);
+  const [isBackDialogOpen, setIsBackDialogOpen] = useState(false);
   const [textInput, setTextInput] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentMediaType, setCurrentMediaType] = useState<'image' | 'video' | 'audio' | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   const collaboratorIds = scrapbook?.collaboratorIds || [];
+
+  const handleBackNavigation = () => {
+    if (scrapbook?.isFinalized) {
+      router.push("/dashboard");
+    } else {
+      setIsBackDialogOpen(true);
+    }
+  };
+
+  const confirmBack = () => {
+    setIsBackDialogOpen(false);
+    router.push("/dashboard");
+  };
 
   const handleFinalize = () => {
     if (!scrapbook?.id) return;
@@ -180,7 +206,17 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={handleBackNavigation}
+            className="rounded-full h-10 w-10 hover:bg-muted/50 transition-colors"
+            aria-label="Go Back"
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </Button>
+          
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold font-headline">{scrapbook?.title}</h1>
@@ -267,6 +303,26 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isBackDialogOpen} onOpenChange={setIsBackDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Discard changes?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              You haven't finalized this design yet. If you leave now, the scrapbook will remain in an unfinalized state. You can continue editing it later from the dashboard.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Editing</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmBack} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Exit to Dashboard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
