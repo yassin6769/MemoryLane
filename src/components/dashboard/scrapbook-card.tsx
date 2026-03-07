@@ -1,7 +1,7 @@
 
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useState } from "react";
 import {
@@ -37,12 +37,14 @@ import { CollaboratorDialog } from "../scrapbook/collaborator-dialog";
 import { useFirestore } from "@/firebase";
 import { deleteScrapbook } from "@/data/scrapbooks";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface ScrapbookCardProps {
   scrapbook: any;
 }
 
 export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
+  const router = useRouter();
   const db = useFirestore();
   const { toast } = useToast();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -70,9 +72,16 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
     }
   };
 
+  const handleCardClick = () => {
+    router.push(`/editor?id=${scrapbook.id}`);
+  };
+
   return (
     <>
-      <Card className="group flex flex-col overflow-hidden h-full transform transition-all duration-300 hover:shadow-xl relative border-muted/60 bg-card/50 backdrop-blur-sm">
+      <Card 
+        className="group flex flex-col overflow-hidden h-full transform transition-all duration-300 hover:shadow-xl relative border-muted/60 bg-card/50 backdrop-blur-sm cursor-pointer"
+        onClick={handleCardClick}
+      >
         {scrapbook.isFinalized && (
           <div className="absolute top-3 right-3 z-10">
             <Badge className="bg-green-500/90 text-white gap-1 backdrop-blur-md border-none shadow-sm">
@@ -82,7 +91,7 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
           </div>
         )}
         
-        <Link href={`/editor?id=${scrapbook.id}`} className="flex-grow">
+        <div className="flex-grow">
           <CardHeader className="p-0">
             <div className="relative h-48 w-full bg-muted/30 overflow-hidden">
               {scrapbook.coverImage ? (
@@ -121,9 +130,12 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
               {scrapbook.isFinalized ? "Locked and preserved memories." : "A creative work in progress."}
             </CardDescription>
           </CardContent>
-        </Link>
+        </div>
 
-        <CardFooter className="p-4 flex justify-between items-center border-t border-muted/40 mt-auto bg-muted/5">
+        <CardFooter 
+          className="p-4 flex justify-between items-center border-t border-muted/40 mt-auto bg-muted/5"
+          onClick={(e) => e.stopPropagation()} // Prevent card navigation when clicking footer area
+        >
           <div className="flex -space-x-2.5">
             {Object.keys(scrapbook.members || {}).slice(0, 3).map((uid, index) => (
               <Avatar key={uid} className="h-8 w-8 border-2 border-background ring-1 ring-muted/20">
@@ -145,16 +157,18 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 p-1">
-              <DropdownMenuItem asChild>
-                <Link href={`/editor?id=${scrapbook.id}`} className="flex items-center gap-2">
-                  <ExternalLink className="h-4 w-4" />
-                  Open Editor
-                </Link>
+              <DropdownMenuItem 
+                onSelect={() => router.push(`/editor?id=${scrapbook.id}`)} 
+                className="flex items-center gap-2"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Open Editor
               </DropdownMenuItem>
               <DropdownMenuItem 
                 onSelect={(e) => {
                   e.preventDefault();
-                  setTimeout(() => setIsShareOpen(true), 100);
+                  // Small delay to let the dropdown close before opening dialog
+                  setTimeout(() => setIsShareOpen(true), 50);
                 }} 
                 className="flex items-center gap-2"
               >
@@ -165,7 +179,8 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
               <DropdownMenuItem 
                 onSelect={(e) => {
                   e.preventDefault();
-                  setTimeout(() => setIsDeleteDialogOpen(true), 100);
+                  // Small delay to let the dropdown close before opening dialog
+                  setTimeout(() => setIsDeleteDialogOpen(true), 50);
                 }}
                 className="text-destructive focus:text-destructive flex items-center gap-2"
               >
