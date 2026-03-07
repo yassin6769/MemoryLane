@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   ImagePlus,
@@ -12,6 +13,9 @@ import {
   Loader2,
   ChevronLeft,
   AlertTriangle,
+  CircleStop,
+  Radio,
+  FileAudio
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
@@ -35,6 +39,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ToolbarProps {
   scrapbook: any;
@@ -55,6 +65,11 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentMediaType, setCurrentMediaType] = useState<'image' | 'video' | 'audio' | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+
+  // Audio Recording State
+  const [isRecording, setIsRecording] = useState(false);
+  const [recorder, setRecorder] = useState<MediaRecorder | null>(null);
+  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
 
   const collaboratorIds = scrapbook?.collaboratorIds || [];
 
@@ -77,13 +92,11 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
     
     const scrapbookRef = doc(db, "scrapbooks", scrapbook.id);
     
-    // Update state in Firestore
     updateDocumentNonBlocking(scrapbookRef, { 
       isFinalized: true,
       updatedAt: serverTimestamp()
     });
     
-    // Feedback and navigation
     setTimeout(() => {
       setIsFinalizing(false);
       toast({
@@ -96,36 +109,63 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
 
   const handleMediaClick = (type: 'image' | 'video' | 'audio') => {
     setCurrentMediaType(type);
-    fileInputRef.current?.click();
+    // Use a short delay to ensure state is set before triggering click
+    setTimeout(() => {
+        fileInputRef.current?.click();
+    }, 50);
   };
 
-  const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user || !pageId) return;
+  // --- Audio Recording Logic ---
 
-    // Strict Mime Type Validation
-    const allowedImages = ['image/png', 'image/jpeg'];
-    const allowedVideos = ['video/mp4', 'video/quicktime'];
-    const allowedAudio = ['audio/mpeg', 'audio/wav', 'audio/m4a'];
-
-    if (currentMediaType === 'image' && !allowedImages.includes(file.type)) {
-      toast({ variant: "destructive", title: "Invalid format", description: "Only PNG and JPEG images are allowed." });
-      return;
-    }
-    if (currentMediaType === 'video' && !allowedVideos.includes(file.type)) {
-      toast({ variant: "destructive", title: "Invalid format", description: "Only MP4 and MOV videos are allowed." });
-      return;
-    }
-    if (currentMediaType === 'audio' && !allowedAudio.includes(file.type)) {
-      toast({ variant: "destructive", title: "Invalid format", description: "Only MP3, WAV, and M4A audio are allowed." });
-      return;
-    }
-
-    setUploadProgress(0);
-    
+  const startRecording = async () => {
     try {
-      const storageRef = ref(storage, `scrapbooks/${scrapbook.id}/pages/${pageId}/${Date.now()}_${file.name}`);
-      const uploadTask = uploadBytesResumable(storageRef, file);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+        await uploadMediaBlob(audioBlob, 'voice_memo.webm', 'audio');
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      setRecorder(mediaRecorder);
+      mediaRecorder.start();
+      setIsRecording(true);
+      toast({
+        title: "Recording Started",
+        description: "Speak clearly into your microphone.",
+      });
+    } catch (err) {
+      console.error("Recording error:", err);
+      toast({
+        variant: "destructive",
+        title: "Mic Access Denied",
+        description: "Please enable microphone permissions in your settings.",
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (recorder && isRecording) {
+      recorder.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const uploadMediaBlob = async (blob: Blob | File, fileName: string, type: 'image' | 'video' | 'audio') => {
+    if (!user || !pageId) return;
+    
+    setUploadProgress(0);
+    setCurrentMediaType(type);
+
+    try {
+      const storageRef = ref(storage, `scrapbooks/${scrapbook.id}/pages/${pageId}/${Date.now()}_${fileName}`);
+      const uploadTask = uploadBytesResumable(storageRef, blob);
 
       uploadTask.on('state_changed', 
         (snapshot) => {
@@ -143,13 +183,13 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
           
           addDocumentNonBlocking(objectsCol, {
             pageId,
-            type: currentMediaType,
+            type: type,
             mediaUri: downloadUrl,
             members: scrapbook.members,
             x: 100,
             y: 100,
-            width: currentMediaType === 'audio' ? 300 : 250,
-            height: currentMediaType === 'audio' ? 80 : 250,
+            width: type === 'audio' ? 300 : 250,
+            height: type === 'audio' ? 80 : 250,
             rotation: 0,
             scaleX: 1,
             scaleY: 1,
@@ -159,13 +199,40 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
           });
 
           setUploadProgress(null);
-          toast({ title: "Success", description: `${currentMediaType} added to your canvas.` });
+          toast({ title: "Success", description: `${type} added to your canvas.` });
         }
       );
     } catch (err) {
       setUploadProgress(null);
       toast({ variant: "destructive", title: "Process Failed", description: "Something went wrong." });
     }
+  };
+
+  const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentMediaType) return;
+
+    // Strict Mime Type Validation for Web/Mobile
+    const allowedImages = ['image/png', 'image/jpeg', 'image/jpg'];
+    const allowedVideos = ['video/mp4', 'video/quicktime', 'video/x-m4v'];
+    const allowedAudio = ['audio/mpeg', 'audio/wav', 'audio/m4a', 'audio/mp3', 'audio/x-m4a'];
+
+    if (currentMediaType === 'image' && !allowedImages.includes(file.type)) {
+      toast({ variant: "destructive", title: "Invalid format", description: "Only PNG and JPEG images are allowed." });
+      return;
+    }
+    if (currentMediaType === 'video' && !allowedVideos.includes(file.type)) {
+      toast({ variant: "destructive", title: "Invalid format", description: "Only MP4 and MOV videos are allowed." });
+      return;
+    }
+    if (currentMediaType === 'audio' && !allowedAudio.includes(file.type)) {
+      toast({ variant: "destructive", title: "Invalid format", description: "Only MP3, WAV, and M4A audio are allowed." });
+      return;
+    }
+
+    await uploadMediaBlob(file, file.name, currentMediaType);
+    // Reset file input value so same file can be selected again if needed
+    e.target.value = '';
   };
 
   const saveText = () => {
@@ -198,10 +265,26 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
       {uploadProgress !== null && (
         <div className="w-full space-y-2 px-1">
           <div className="flex justify-between text-xs font-medium">
-            <span>Uploading {currentMediaType}...</span>
+            <span className="animate-pulse flex items-center gap-2">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Uploading {currentMediaType}...
+            </span>
             <span>{Math.round(uploadProgress)}%</span>
           </div>
           <Progress value={uploadProgress} className="h-2" />
+        </div>
+      )}
+
+      {isRecording && (
+        <div className="w-full bg-destructive/10 border border-destructive/20 p-2 rounded-lg flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-3">
+                <div className="h-3 w-3 rounded-full bg-destructive animate-pulse" />
+                <span className="text-sm font-medium text-destructive">Recording Voice Memo...</span>
+            </div>
+            <Button variant="destructive" size="sm" onClick={stopRecording} className="h-8 gap-2">
+                <CircleStop className="h-4 w-4" />
+                Stop & Save
+            </Button>
         </div>
       )}
 
@@ -230,37 +313,60 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
         </div>
         
         <div className="flex items-center gap-2">
+          {/* Unified File Input with dynamic accept attribute */}
           <input
             type="file"
             ref={fileInputRef}
             className="hidden"
-            accept={currentMediaType === 'image' ? 'image/png,image/jpeg' : currentMediaType === 'video' ? 'video/mp4,video/quicktime' : 'audio/*'}
+            accept={
+                currentMediaType === 'image' 
+                ? 'image/png,image/jpeg,image/jpg' 
+                : currentMediaType === 'video' 
+                ? 'video/mp4,video/quicktime' 
+                : 'audio/mpeg,audio/wav,audio/m4a'
+            }
             onChange={onFileChange}
           />
           
-          <Button variant="outline" size="sm" onClick={() => handleMediaClick('image')} disabled={scrapbook?.isFinalized}>
+          <Button variant="outline" size="sm" onClick={() => handleMediaClick('image')} disabled={scrapbook?.isFinalized || isRecording}>
             <ImagePlus className="mr-2 h-4 w-4" />
             Image
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setIsTextDialogOpen(true)} disabled={scrapbook?.isFinalized}>
+          <Button variant="outline" size="sm" onClick={() => setIsTextDialogOpen(true)} disabled={scrapbook?.isFinalized || isRecording}>
             <Type className="mr-2 h-4 w-4" />
             Text
           </Button>
-          <Button variant="outline" size="sm" onClick={() => handleMediaClick('video')} disabled={scrapbook?.isFinalized}>
+          <Button variant="outline" size="sm" onClick={() => handleMediaClick('video')} disabled={scrapbook?.isFinalized || isRecording}>
             <Video className="mr-2 h-4 w-4" />
             Video
           </Button>
-          <Button variant="outline" size="sm" onClick={() => handleMediaClick('audio')} disabled={scrapbook?.isFinalized}>
-            <Mic className="mr-2 h-4 w-4" />
-            Audio
-          </Button>
+
+          {/* Audio Dropdown for Record vs Select */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={scrapbook?.isFinalized || isRecording}>
+                    <Mic className="mr-2 h-4 w-4" />
+                    Audio
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={startRecording} className="gap-2">
+                    <Radio className="h-4 w-4 text-destructive" />
+                    Record New Memo
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleMediaClick('audio')} className="gap-2">
+                    <FileAudio className="h-4 w-4" />
+                    Select Audio File
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           
           <div className="h-6 border-l mx-2" />
           
           <div className="flex -space-x-2 mr-2">
-            {collaboratorIds.map((id: string, index: number) => (
-              <Avatar key={id} className="h-8 w-8 border-2 border-background">
-                <AvatarImage src={`https://picsum.photos/seed/30${index + 2}/40/40`} />
+            {Object.keys(scrapbook?.members || {}).slice(0, 3).map((uid, index) => (
+              <Avatar key={uid} className="h-8 w-8 border-2 border-background">
+                <AvatarImage src={`https://picsum.photos/seed/${uid}/40/40`} />
                 <AvatarFallback>U</AvatarFallback>
               </Avatar>
             ))}
@@ -271,7 +377,7 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
             Share
           </Button>
           
-          <Button size="sm" onClick={handleFinalize} disabled={isFinalizing || scrapbook?.isFinalized}>
+          <Button size="sm" onClick={handleFinalize} disabled={isFinalizing || scrapbook?.isFinalized || isRecording}>
             {isFinalizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
             {scrapbook?.isFinalized ? "Finalized" : "Finalize Design"}
           </Button>
