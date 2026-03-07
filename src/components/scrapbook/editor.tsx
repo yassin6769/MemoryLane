@@ -65,7 +65,11 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
   const activePage = pages?.[activePageIndex];
   const activePageId = activePage?.id;
 
-  // Fetch objects for the active page
+  /**
+   * REAL-TIME SYNCHRONIZATION
+   * Fetch objects for the active page. This uses onSnapshot internally
+   * to ensure the UI updates instantly when any user adds or moves objects.
+   */
   const objectsQuery = useMemoFirebase(() => {
     if (!activePageId) return null;
     return collection(db, "scrapbooks", scrapbook.id, "pages", activePageId, "canvasObjects");
@@ -73,7 +77,7 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
 
   const { data: serverItems } = useCollection<any>(objectsQuery);
 
-  // Sync server items to local state for smooth dragging
+  // Sync server items to local state for smooth interaction (Optimistic UI)
   useEffect(() => {
     if (serverItems) {
       setLocalItems(serverItems);
@@ -173,7 +177,12 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
 
   return (
     <div className="flex flex-col h-full gap-4">
-      <Toolbar scrapbook={scrapbook} pageId={activePageId} />
+      {/* Passing localItems to Toolbar for zIndex calculation */}
+      <Toolbar 
+        scrapbook={scrapbook} 
+        pageId={activePageId} 
+        items={localItems} 
+      />
       
       <div className="flex-grow flex flex-col gap-4 perspective-1000">
         <PagePagination 

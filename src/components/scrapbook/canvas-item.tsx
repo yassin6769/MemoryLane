@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, type MouseEvent } from "react";
@@ -42,7 +43,7 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     const dx = e.clientX - dragStartPos.current.x;
     const dy = e.clientY - dragStartPos.current.y;
     
-    // Finalize the update in Firestore
+    // Persist final position to Firestore
     const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", item.id);
     updateDocumentNonBlocking(docRef, {
       x: itemStartPos.current.x + dx,
@@ -51,11 +52,16 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     });
   };
 
+  /**
+   * CANVAS RENDERING (UI)
+   * Dynamically renders media based on the object type.
+   * Equivalent to Glide/Coil for image loading in Android.
+   */
   const renderContent = () => {
     switch (item.type) {
       case "image":
         return (
-          <div className="relative w-full h-full overflow-hidden rounded-sm">
+          <div className="relative w-full h-full overflow-hidden rounded-sm bg-muted/20">
             <Image
               src={item.mediaUri}
               alt="Memory"
@@ -77,7 +83,7 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
         return (
           <video 
             src={item.mediaUri} 
-            className="w-full h-full object-cover pointer-events-none"
+            className="w-full h-full object-cover pointer-events-none rounded-sm bg-black"
             muted
             autoPlay
             loop
@@ -85,11 +91,11 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
         );
       case "audio":
         return (
-          <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-primary/10 rounded-lg pointer-events-none">
-            <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center mb-2">
+          <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-primary/5 rounded-lg border border-primary/20 pointer-events-none">
+            <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center mb-2 shadow-sm">
               <div className="w-4 h-4 bg-white rounded-full animate-pulse" />
             </div>
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Audio Memory</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Voice Memo</p>
           </div>
         );
       default:
@@ -102,16 +108,18 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
       onMouseDown={handleMouseDown}
       className={cn(
         "absolute transition-shadow duration-300",
-        isDragging ? "cursor-grabbing shadow-2xl ring-2 ring-primary z-50 scale-105" : "cursor-grab shadow-lg",
-        item.type === "text" ? "bg-transparent" : "bg-white p-2"
+        isDragging ? "cursor-grabbing shadow-2xl ring-2 ring-primary scale-105" : "cursor-grab shadow-md hover:shadow-lg",
+        item.type === "text" ? "bg-transparent" : "bg-white p-2 border border-muted/30"
       )}
       style={{
         left: `${item.x}px`,
         top: `${item.y}px`,
         width: `${item.width}px`,
         height: `${item.height}px`,
-        transform: `rotate(${item.rotation || 0}deg)`,
+        // DYNAMIC TRANSFORM LOGIC
+        transform: `rotate(${item.rotation || 0}deg) scaleX(${item.scaleX || 1}) scaleY(${item.scaleY || 1})`,
         transformOrigin: 'center center',
+        zIndex: isDragging ? 9999 : (item.zIndex || 1),
       }}
     >
       {renderContent()}

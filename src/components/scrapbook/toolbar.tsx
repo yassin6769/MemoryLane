@@ -49,9 +49,10 @@ import {
 interface ToolbarProps {
   scrapbook: any;
   pageId?: string;
+  items?: any[]; // Recieve items to calculate next zIndex
 }
 
-export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
+export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
   const router = useRouter();
   const { toast } = useToast();
   const db = useFirestore();
@@ -69,9 +70,6 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
   // Audio Recording State
   const [isRecording, setIsRecording] = useState(false);
   const [recorder, setRecorder] = useState<MediaRecorder | null>(null);
-  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
-
-  const collaboratorIds = scrapbook?.collaboratorIds || [];
 
   const handleBackNavigation = () => {
     if (scrapbook?.isFinalized) {
@@ -109,13 +107,10 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
 
   const handleMediaClick = (type: 'image' | 'video' | 'audio') => {
     setCurrentMediaType(type);
-    // Use a short delay to ensure state is set before triggering click
     setTimeout(() => {
         fileInputRef.current?.click();
     }, 50);
   };
-
-  // --- Audio Recording Logic ---
 
   const startRecording = async () => {
     try {
@@ -157,6 +152,10 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
     }
   };
 
+  /**
+   * DYNAMIC PLACEMENT LOGIC
+   * Creates a new CanvasObject with default placement values and calculated zIndex.
+   */
   const uploadMediaBlob = async (blob: Blob | File, fileName: string, type: 'image' | 'video' | 'audio') => {
     if (!user || !pageId) return;
     
@@ -181,6 +180,9 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
           const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
           const objectsCol = collection(db, "scrapbooks", scrapbook.id, "pages", pageId, "canvasObjects");
           
+          // Calculate next zIndex
+          const nextZIndex = items.length > 0 ? Math.max(...items.map((i: any) => i.zIndex || 0)) + 1 : 1;
+
           addDocumentNonBlocking(objectsCol, {
             pageId,
             type: type,
@@ -193,7 +195,7 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
             rotation: 0,
             scaleX: 1,
             scaleY: 1,
-            zIndex: 1,
+            zIndex: nextZIndex,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
@@ -211,27 +213,7 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
   const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !currentMediaType) return;
-
-    // Strict Mime Type Validation for Web/Mobile
-    const allowedImages = ['image/png', 'image/jpeg', 'image/jpg'];
-    const allowedVideos = ['video/mp4', 'video/quicktime', 'video/x-m4v'];
-    const allowedAudio = ['audio/mpeg', 'audio/wav', 'audio/m4a', 'audio/mp3', 'audio/x-m4a'];
-
-    if (currentMediaType === 'image' && !allowedImages.includes(file.type)) {
-      toast({ variant: "destructive", title: "Invalid format", description: "Only PNG and JPEG images are allowed." });
-      return;
-    }
-    if (currentMediaType === 'video' && !allowedVideos.includes(file.type)) {
-      toast({ variant: "destructive", title: "Invalid format", description: "Only MP4 and MOV videos are allowed." });
-      return;
-    }
-    if (currentMediaType === 'audio' && !allowedAudio.includes(file.type)) {
-      toast({ variant: "destructive", title: "Invalid format", description: "Only MP3, WAV, and M4A audio are allowed." });
-      return;
-    }
-
     await uploadMediaBlob(file, file.name, currentMediaType);
-    // Reset file input value so same file can be selected again if needed
     e.target.value = '';
   };
 
@@ -239,6 +221,8 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
     if (!textInput.trim() || !pageId) return;
 
     const objectsCol = collection(db, "scrapbooks", scrapbook.id, "pages", pageId, "canvasObjects");
+    const nextZIndex = items.length > 0 ? Math.max(...items.map((i: any) => i.zIndex || 0)) + 1 : 1;
+
     addDocumentNonBlocking(objectsCol, {
       pageId,
       type: "text",
@@ -251,7 +235,7 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
       rotation: 0,
       scaleX: 1,
       scaleY: 1,
-      zIndex: 10,
+      zIndex: nextZIndex,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -295,7 +279,6 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
             size="icon" 
             onClick={handleBackNavigation}
             className="rounded-full h-10 w-10 hover:bg-muted/50 transition-colors"
-            aria-label="Go Back"
           >
             <ChevronLeft className="h-6 w-6" />
           </Button>
@@ -313,7 +296,6 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
         </div>
         
         <div className="flex items-center gap-2">
-          {/* Unified File Input with dynamic accept attribute */}
           <input
             type="file"
             ref={fileInputRef}
@@ -341,7 +323,6 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
             Video
           </Button>
 
-          {/* Audio Dropdown for Record vs Select */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" disabled={scrapbook?.isFinalized || isRecording}>
@@ -364,7 +345,7 @@ export function Toolbar({ scrapbook, pageId }: ToolbarProps) {
           <div className="h-6 border-l mx-2" />
           
           <div className="flex -space-x-2 mr-2">
-            {Object.keys(scrapbook?.members || {}).slice(0, 3).map((uid, index) => (
+            {Object.keys(scrapbook?.members || {}).slice(0, 3).map((uid) => (
               <Avatar key={uid} className="h-8 w-8 border-2 border-background">
                 <AvatarImage src={`https://picsum.photos/seed/${uid}/40/40`} />
                 <AvatarFallback>U</AvatarFallback>
