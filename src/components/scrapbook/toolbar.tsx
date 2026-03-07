@@ -162,6 +162,17 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
   const uploadMediaBlob = async (blob: Blob | File, fileName: string, type: 'image' | 'video' | 'audio') => {
     console.log(`[MediaUpload] Starting upload process for ${fileName} (${type})`);
     
+    // SAFETY CHECK: Verify Storage Initialization
+    if (!storage || !storage.app.options.storageBucket) {
+        console.error("[MediaUpload] Firebase Error: Storage Bucket not found. Check firebase/config.ts");
+        toast({ 
+            variant: "destructive", 
+            title: "Configuration Error", 
+            description: "Firebase Storage is not properly initialized. Default bucket is missing." 
+        });
+        return;
+    }
+
     if (!user) {
       console.error("[MediaUpload] Failed: User not authenticated.");
       toast({ variant: "destructive", title: "Upload Failed", description: "You must be logged in to upload media." });
@@ -201,6 +212,8 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
             errorMessage = "Storage quota exceeded. Please contact support.";
           } else if (error.code === 'storage/canceled') {
             errorMessage = "Upload was canceled by the user.";
+          } else if (error.code === 'storage/no-default-bucket') {
+            errorMessage = "Storage Bucket not found. Check your configuration.";
           }
 
           toast({ 
