@@ -5,11 +5,14 @@ import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebas
 import ScrapbookCard from "@/components/dashboard/scrapbook-card";
 import { CreateScrapbookDialog } from "@/components/dashboard/create-scrapbook-dialog";
 import { collection, query, where } from "firebase/firestore";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
   const db = useFirestore();
   const { user, isUserLoading } = useUser();
+  const router = useRouter();
 
   /**
    * Query scrapbooks where the current user is a member.
@@ -36,11 +39,26 @@ export default function Dashboard() {
 
   return (
     <div className="container mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold font-headline">Your Scrapbooks</h1>
-        <CreateScrapbookDialog />
+      {/* Header with Back Button and Actions */}
+      <div className="flex flex-col gap-6 mb-8">
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => router.back()}
+            className="rounded-full h-10 w-10 hover:bg-muted/50 transition-colors"
+            aria-label="Go Back"
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </Button>
+          <div className="flex flex-grow items-center justify-between">
+            <h1 className="text-3xl font-bold font-headline">Your Scrapbooks</h1>
+            <CreateScrapbookDialog />
+          </div>
+        </div>
       </div>
 
+      {/* Main Grid Content */}
       {scrapbooks && scrapbooks.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {scrapbooks.map((scrapbook) => (
