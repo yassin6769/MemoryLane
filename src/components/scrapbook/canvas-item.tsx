@@ -8,7 +8,7 @@ import { updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase
 import { doc, getFirestore, serverTimestamp } from "firebase/firestore";
 import { ref, deleteObject } from "firebase/storage";
 import { useStorage } from "@/firebase";
-import { Trash2, AlertTriangle, RotateCcw, FlipHorizontal, Maximize2, Move, Bold, Underline, Plus, Minus } from "lucide-react";
+import { Trash2, AlertTriangle, FlipHorizontal, Move } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -20,43 +20,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
 interface CanvasItemProps {
   item: any;
+  isSelected: boolean;
+  onSelect: () => void;
   onUpdatePosition: (id: string, x: number, y: number) => void;
   scrapbookId: string;
   pageId: string;
 }
 
-type InteractionMode = 'drag' | 'resize' | 'rotate' | null;
-
-export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: CanvasItemProps) {
-  const [interactionMode, setInteractionMode] = useState<InteractionMode>(null);
-  const [isSelected, setIsSelected] = useState(false);
+export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrapbookId, pageId }: CanvasItemProps) {
+  const [isDragging, setIsDragging] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
-  // Refs for tracking movement without triggering React renders for 60fps
   const interactionStart = useRef({ 
     clientX: 0, 
     clientY: 0, 
     x: 0, 
-    y: 0, 
-    width: 0, 
-    height: 0, 
-    rotation: 0,
-    angle: 0,
-    dist: 0,
-    vCenterX: 0,
-    vCenterY: 0
+    y: 0 
   });
   
   const hasMoved = useRef(false);
@@ -66,38 +50,21 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
   const storage = useStorage();
   const { toast } = useToast();
 
-  const handleMouseDown = (e: MouseEvent<HTMLDivElement>, mode: InteractionMode = 'drag') => {
+  const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
-    
-    // Filter out UI button clicks from the parent container's drag detection
+    onSelect();
+
     const target = e.target as HTMLElement;
-    if (target.closest('.action-button') && mode === 'drag') return;
+    if (target.closest('.action-button')) return;
 
-    setInteractionMode(mode);
+    setIsDragging(true);
     hasMoved.current = false;
-
-    const rect = itemRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    // Calculate stable center for rotation and resize math
-    const vCenterX = rect.left + rect.width / 2;
-    const vCenterY = rect.top + rect.height / 2;
-
-    const dx = e.clientX - vCenterX;
-    const dy = e.clientY - vCenterY;
 
     interactionStart.current = {
       clientX: e.clientX,
       clientY: e.clientY,
       x: item.x,
       y: item.y,
-      width: item.width,
-      height: item.height,
-      rotation: item.rotation || 0,
-      angle: Math.atan2(dy, dx),
-      dist: Math.sqrt(dx * dx + dy * dy),
-      vCenterX,
-      vCenterY
     };
     
     window.addEventListener("mousemove", handleMouseMove);
@@ -105,102 +72,46 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
   };
 
   const handleMouseMove = (e: globalThis.MouseEvent) => {
-    if (!interactionMode || !itemRef.current) return;
+    if (!itemRef.current) return;
     hasMoved.current = true;
 
     const parentRect = itemRef.current.parentElement?.getBoundingClientRect();
     if (!parentRect) return;
 
-    const { 
-      vCenterX, 
-      vCenterY, 
-      clientX: startClientX, 
-      clientY: startClientY, 
-      x: startX, 
-      y: startY, 
-      width: startW, 
-      height: startH, 
-      rotation: startR, 
-      dist: startDist, 
-      angle: startAngle 
-    } = interactionStart.current;
+    const { clientX: startClientX, clientY: startClientY, x: startX, y: startY } = interactionStart.current;
 
-    if (interactionMode === 'drag') {
-      const dx = e.clientX - startClientX;
-      const dy = e.clientY - startClientY;
-      
-      let newX = startX + dx;
-      let newY = startY + dy;
+    const dx = e.clientX - startClientX;
+    const dy = e.clientY - startClientY;
+    
+    let newX = startX + dx;
+    let newY = startY + dy;
 
-      // Keep within parent boundaries
-      newX = Math.max(0, Math.min(newX, parentRect.width - startW));
-      newY = Math.max(0, Math.min(newY, parentRect.height - startH));
+    // Boundary constraints
+    newX = Math.max(0, Math.min(newX, parentRect.width - (item.width * (item.scaleX || 1))));
+    newY = Math.max(0, Math.min(newY, parentRect.height - (item.height * (item.scaleY || 1))));
 
-      itemRef.current.style.left = `${newX}px`;
-      itemRef.current.style.top = `${newY}px`;
-    } 
-    else if (interactionMode === 'resize') {
-      const dx = e.clientX - vCenterX;
-      const dy = e.clientY - vCenterY;
-      const currentDist = Math.sqrt(dx * dx + dy * dy);
-      const ratio = currentDist / startDist;
-
-      const newWidth = Math.max(50, startW * ratio);
-      // For images and video, maintain original aspect ratio
-      const newHeight = (item.type === 'video' || item.type === 'image')
-        ? (newWidth * startH) / startW
-        : Math.max(30, startH * ratio);
-
-      itemRef.current.style.width = `${newWidth}px`;
-      itemRef.current.style.height = `${newHeight}px`;
-    }
-    else if (interactionMode === 'rotate') {
-      const dx = e.clientX - vCenterX;
-      const dy = e.clientY - vCenterY;
-      const currentAngle = Math.atan2(dy, dx);
-      const rotationDiff = (currentAngle - startAngle) * (180 / Math.PI);
-      const finalRotation = (startR + rotationDiff) % 360;
-      
-      itemRef.current.style.transform = `rotate(${finalRotation}deg)`;
-    }
+    itemRef.current.style.left = `${newX}px`;
+    itemRef.current.style.top = `${newY}px`;
   };
 
-  const handleMouseUp = (e: globalThis.MouseEvent) => {
-    const finalMode = interactionMode;
-    setInteractionMode(null);
+  const handleMouseUp = () => {
+    setIsDragging(false);
     window.removeEventListener("mousemove", handleMouseMove);
     window.removeEventListener("mouseup", handleMouseUp);
 
-    // If no movement occurred, toggle selection
-    if (!hasMoved.current) {
-      setIsSelected(!isSelected);
-      return;
-    }
+    if (!itemRef.current || !hasMoved.current) return;
 
-    if (!itemRef.current) return;
+    const finalX = parseFloat(itemRef.current.style.left);
+    const finalY = parseFloat(itemRef.current.style.top);
+    
+    onUpdatePosition(item.id, finalX, finalY);
 
-    // Persist final transformation state to Firestore
     const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", item.id);
-    const updates: any = { updatedAt: serverTimestamp() };
-
-    if (finalMode === 'drag') {
-      updates.x = parseFloat(itemRef.current.style.left);
-      updates.y = parseFloat(itemRef.current.style.top);
-      onUpdatePosition(item.id, updates.x, updates.y);
-    } 
-    else if (finalMode === 'resize') {
-      updates.width = parseFloat(itemRef.current.style.width);
-      updates.height = parseFloat(itemRef.current.style.height);
-    }
-    else if (finalMode === 'rotate') {
-      const transform = itemRef.current.style.transform;
-      const match = transform.match(/rotate\((.*)deg\)/);
-      if (match) {
-        updates.rotation = parseFloat(match[1]);
-      }
-    }
-
-    updateDocumentNonBlocking(docRef, updates);
+    updateDocumentNonBlocking(docRef, {
+      x: finalX,
+      y: finalY,
+      updatedAt: serverTimestamp()
+    });
   };
 
   const handleFlip = (e: React.MouseEvent) => {
@@ -208,43 +119,6 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", item.id);
     updateDocumentNonBlocking(docRef, {
       scaleX: (item.scaleX || 1) * -1,
-      updatedAt: serverTimestamp()
-    });
-    toast({ title: "Memory Flipped" });
-  };
-
-  const handleToggleBold = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", item.id);
-    updateDocumentNonBlocking(docRef, {
-      isBold: !item.isBold,
-      updatedAt: serverTimestamp()
-    });
-  };
-
-  const handleToggleUnderline = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", item.id);
-    updateDocumentNonBlocking(docRef, {
-      isUnderline: !item.isUnderline,
-      updatedAt: serverTimestamp()
-    });
-  };
-
-  const handleFontSizeChange = (e: React.MouseEvent, delta: number) => {
-    e.stopPropagation();
-    const newSize = Math.max(8, (item.fontSize || 24) + delta);
-    const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", item.id);
-    updateDocumentNonBlocking(docRef, {
-      fontSize: newSize,
-      updatedAt: serverTimestamp()
-    });
-  };
-
-  const handleFontFamilyChange = (font: string) => {
-    const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", item.id);
-    updateDocumentNonBlocking(docRef, {
-      fontFamily: font,
       updatedAt: serverTimestamp()
     });
   };
@@ -257,7 +131,7 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
           const storageRef = ref(storage, item.mediaUri);
           await deleteObject(storageRef);
         } catch (sErr) { 
-          console.warn("[Cleanup] Storage file not found or already deleted:", sErr); 
+          console.warn("[Cleanup] Storage file already removed:", sErr); 
         }
       }
       const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", item.id);
@@ -275,7 +149,7 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     switch (item.type) {
       case "image":
         return (
-          <div className="relative w-full h-full overflow-hidden rounded-sm bg-muted/20 pointer-events-none select-none">
+          <div className="relative w-full h-full overflow-hidden rounded-sm pointer-events-none select-none">
             <Image
               src={item.mediaUri}
               alt="Memory"
@@ -287,7 +161,7 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
         );
       case "text":
         return (
-          <div className="w-full h-full p-4 flex items-center justify-center pointer-events-none bg-white/40 backdrop-blur-[2px] rounded-lg border border-dashed border-primary/20 overflow-hidden">
+          <div className="w-full h-full p-4 flex items-center justify-center pointer-events-none bg-white/20 rounded-lg overflow-hidden">
             <p className={cn(
               "text-center leading-tight text-foreground/80",
               item.fontFamily || "font-serif",
@@ -328,11 +202,11 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     <>
       <div
         ref={itemRef}
-        onMouseDown={(e) => handleMouseDown(e, 'drag')}
+        onMouseDown={handleMouseDown}
         className={cn(
           "absolute transition-shadow duration-300 transform-gpu select-none",
-          interactionMode === 'drag' ? "cursor-grabbing shadow-2xl z-[9999]" : "cursor-grab shadow-md hover:shadow-lg",
-          isSelected ? "ring-2 ring-primary ring-offset-2 z-[999]" : "",
+          isDragging ? "cursor-grabbing shadow-2xl z-[9999]" : "cursor-grab shadow-sm hover:shadow-md",
+          isSelected ? "ring-2 ring-primary ring-offset-2 z-[999] shadow-xl" : "",
           item.type === "text" ? "bg-transparent" : "bg-white p-2 border border-muted/30 rounded-sm"
         )}
         style={{
@@ -340,16 +214,20 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
           top: `${item.y}px`,
           width: `${item.width}px`,
           height: `${item.height}px`,
-          transform: `rotate(${item.rotation || 0}deg)`,
+          transform: `rotate(${item.rotation || 0}deg) scale(${Math.abs(item.scaleX || 1)}, ${item.scaleY || 1})`,
           transformOrigin: 'center center',
-          zIndex: interactionMode ? 9999 : (item.zIndex || 1),
+          zIndex: isSelected ? 999 : (item.zIndex || 1),
         }}
       >
-        {/* Isolated content layer for flipping */}
+        {/* Selection Glow */}
+        {isSelected && (
+          <div className="absolute -inset-4 bg-primary/5 rounded-lg -z-10 animate-pulse" />
+        )}
+
         <div 
           className="w-full h-full pointer-events-none"
           style={{
-            transform: `scaleX(${item.scaleX || 1}) scaleY(${item.scaleY || 1})`,
+            transform: `scaleX(${(item.scaleX || 1) < 0 ? -1 : 1})`,
             transformOrigin: 'center center'
           }}
         >
@@ -357,118 +235,38 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
         </div>
 
         {isSelected && (
-          <div className="absolute inset-0 pointer-events-none">
-            {/* TEXT FORMATTING TOOLBAR */}
-            {item.type === 'text' && (
-              <div className="absolute -top-28 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-primary/20 rounded-full p-1.5 shadow-lg pointer-events-auto z-[110] action-button flex-nowrap whitespace-nowrap min-w-max">
-                <Select value={item.fontFamily || "font-serif"} onValueChange={handleFontFamilyChange}>
-                  <SelectTrigger className="h-8 w-[110px] rounded-full border-none focus:ring-0">
-                    <SelectValue placeholder="Font" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="font-serif">Serif</SelectItem>
-                    <SelectItem value="font-sans">Sans</SelectItem>
-                    <SelectItem value="font-mono">Mono</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <div className="h-6 w-px bg-muted mx-1" />
-
-                <Button 
-                  size="icon" 
-                  variant="ghost" 
-                  className="h-8 w-8 rounded-full hover:bg-primary/10"
-                  onClick={(e) => handleFontSizeChange(e, -2)}
-                >
-                  <Minus className="h-3 w-3" />
-                </Button>
-                <span className="text-xs font-medium w-6 text-center">{item.fontSize || 24}</span>
-                <Button 
-                  size="icon" 
-                  variant="ghost" 
-                  className="h-8 w-8 rounded-full hover:bg-primary/10"
-                  onClick={(e) => handleFontSizeChange(e, 2)}
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
-
-                <div className="h-6 w-px bg-muted mx-1" />
-
-                <Button 
-                  size="icon" 
-                  variant={item.isBold ? "default" : "ghost"} 
-                  className="h-8 w-8 rounded-full hover:bg-primary/10"
-                  onClick={handleToggleBold}
-                  title="Bold"
-                >
-                  <span className="font-bold text-base">B</span>
-                </Button>
-                <Button 
-                  size="icon" 
-                  variant={item.isUnderline ? "default" : "ghost"} 
-                  className="h-8 w-8 rounded-full hover:bg-primary/10"
-                  onClick={handleToggleUnderline}
-                  title="Underline"
-                >
-                  <span className="underline text-base">U</span>
-                </Button>
-              </div>
-            )}
-
-            {/* ROTATE HANDLE */}
-            <div 
-              onMouseDown={(e) => handleMouseDown(e, 'rotate')}
-              className="absolute -top-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 cursor-alias group pointer-events-auto z-[100] action-button"
-            >
-              <div className="w-0.5 h-6 bg-primary" />
-              <Button size="icon" variant="outline" className="h-8 w-8 rounded-full border-primary bg-white shadow-md hover:bg-primary hover:text-white transition-colors">
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* DELETE BUTTON */}
+          <>
             <Button 
               variant="destructive" 
               size="icon" 
-              className="absolute -top-4 -right-4 h-8 w-8 rounded-full shadow-lg action-button pointer-events-auto z-[102]"
+              className="absolute -top-3 -right-3 h-6 w-6 rounded-full shadow-lg action-button pointer-events-auto z-[1002]"
               onClick={(e) => { e.stopPropagation(); setIsDeleteDialogOpen(true); }}
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-3 w-3" />
             </Button>
 
-            {/* FLIP BUTTON */}
             <Button 
               variant="secondary" 
               size="icon" 
-              className="absolute -bottom-4 -left-4 h-8 w-8 rounded-full shadow-lg action-button pointer-events-auto z-[102]"
+              className="absolute -bottom-3 -right-3 h-6 w-6 rounded-full shadow-lg action-button pointer-events-auto z-[1002]"
               onClick={handleFlip}
             >
-              <FlipHorizontal className="h-4 w-4" />
+              <FlipHorizontal className="h-3 w-3" />
             </Button>
 
-            {/* RESIZE HANDLE */}
-            <div 
-              onMouseDown={(e) => handleMouseDown(e, 'resize')}
-              className="absolute -bottom-4 -right-4 h-8 w-8 bg-white border-2 border-primary rounded-full cursor-nwse-resize shadow-lg pointer-events-auto z-[100] flex items-center justify-center active:bg-primary group transition-colors action-button"
-            >
-              <Maximize2 className="h-4 w-4 text-primary group-active:text-white" />
+            <div className="absolute inset-0 border border-dashed border-primary/40 rounded-sm pointer-events-none" />
+            
+            <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
+              <Move className="h-12 w-12 text-primary" />
             </div>
-
-            {/* MOVE HINT */}
-            <div className="absolute inset-4 border border-dashed border-primary/20 flex items-center justify-center rounded-md bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Move className="h-6 w-6 text-primary/40" />
-            </div>
-          </div>
+          </>
         )}
       </div>
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              Remove this memory?
-            </AlertDialogTitle>
+            <AlertDialogTitle>Remove this memory?</AlertDialogTitle>
             <AlertDialogDescription>
               This item will be permanently deleted from your scrapbook page.
             </AlertDialogDescription>

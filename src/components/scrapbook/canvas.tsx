@@ -1,3 +1,4 @@
+
 "use client";
 
 import { CanvasItem } from "./canvas-item";
@@ -23,11 +24,13 @@ interface CanvasProps {
   scrapbookId: string;
   pageId: string;
   items: any[];
+  selectedItemId: string | null;
+  onSelectItem: (id: string | null) => void;
   onUpdateItemPosition: (id: string, x: number, y: number) => void;
   className?: string;
 }
 
-export function Canvas({ scrapbookId, pageId, items, onUpdateItemPosition, className }: CanvasProps) {
+export function Canvas({ scrapbookId, pageId, items, selectedItemId, onSelectItem, onUpdateItemPosition, className }: CanvasProps) {
   const { toast } = useToast();
   const db = getFirestore();
 
@@ -36,16 +39,25 @@ export function Canvas({ scrapbookId, pageId, items, onUpdateItemPosition, class
       const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", item.id);
       deleteDocumentNonBlocking(docRef);
     });
+    onSelectItem(null);
     toast({
       title: "Canvas cleared",
       description: "All objects have been removed from this page.",
     });
   };
 
+  const handleCanvasClick = (e: React.MouseEvent) => {
+    // If clicking directly on the canvas background, deselect
+    if (e.target === e.currentTarget) {
+      onSelectItem(null);
+    }
+  };
+
   return (
     <div className={cn("flex flex-col gap-4 h-full preserve-3d backface-hidden", className)}>
       <div
-        className="relative w-full h-[70vh] rounded-lg overflow-hidden border bg-white shadow-inner preserve-3d"
+        onClick={handleCanvasClick}
+        className="relative w-full h-[70vh] rounded-lg overflow-hidden border bg-white shadow-inner preserve-3d cursor-crosshair"
         style={{
           backgroundImage:
             "radial-gradient(circle at 1px 1px, hsl(var(--border)) 1px, transparent 0)",
@@ -56,13 +68,15 @@ export function Canvas({ scrapbookId, pageId, items, onUpdateItemPosition, class
           <CanvasItem
             key={item.id}
             item={item}
+            isSelected={selectedItemId === item.id}
+            onSelect={() => onSelectItem(item.id)}
             onUpdatePosition={onUpdateItemPosition}
             scrapbookId={scrapbookId}
             pageId={pageId}
           />
         ))}
         {items.length === 0 && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground pointer-events-none">
             <p className="text-xl font-headline">Empty Canvas</p>
             <p className="text-sm">Use the toolbar to add media and memories.</p>
           </div>

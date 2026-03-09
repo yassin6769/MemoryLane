@@ -1,0 +1,202 @@
+
+"use client";
+
+import { useState, useEffect } from "react";
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { 
+  RotateCcw, 
+  Maximize2, 
+  Type, 
+  X, 
+  Bold, 
+  Underline,
+  Plus,
+  Minus
+} from "lucide-react";
+import { doc, getFirestore, serverTimestamp } from "firebase/firestore";
+import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+interface EditingPanelProps {
+  selectedItem: any;
+  scrapbookId: string;
+  pageId: string;
+  onClose: () => void;
+}
+
+export function EditingPanel({ selectedItem, scrapbookId, pageId, onClose }: EditingPanelProps) {
+  const db = getFirestore();
+  const { toast } = useToast();
+  
+  // Local state for sliders to allow smooth dragging before Firestore update
+  const [rotation, setRotation] = useState(selectedItem.rotation || 0);
+  const [scale, setScale] = useState(selectedItem.scaleX || 1);
+
+  useEffect(() => {
+    setRotation(selectedItem.rotation || 0);
+    setScale(Math.abs(selectedItem.scaleX || 1));
+  }, [selectedItem.id, selectedItem.rotation, selectedItem.scaleX]);
+
+  const updateFirestore = (updates: any) => {
+    const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", selectedItem.id);
+    updateDocumentNonBlocking(docRef, {
+      ...updates,
+      updatedAt: serverTimestamp()
+    });
+  };
+
+  const handleRotationChange = (val: number[]) => {
+    setRotation(val[0]);
+  };
+
+  const handleRotationCommit = (val: number[]) => {
+    updateFirestore({ rotation: val[0] });
+  };
+
+  const handleScaleChange = (val: number[]) => {
+    setScale(val[0]);
+  };
+
+  const handleScaleCommit = (val: number[]) => {
+    const isFlipped = (selectedItem.scaleX || 1) < 0;
+    updateFirestore({ 
+      scaleX: val[0] * (isFlipped ? -1 : 1),
+      scaleY: val[0]
+    });
+  };
+
+  const toggleBold = () => {
+    updateFirestore({ isBold: !selectedItem.isBold });
+  };
+
+  const toggleUnderline = () => {
+    updateFirestore({ isUnderline: !selectedItem.isUnderline });
+  };
+
+  const adjustFontSize = (delta: number) => {
+    const newSize = Math.max(8, (selectedItem.fontSize || 24) + delta);
+    updateFirestore({ fontSize: newSize });
+  };
+
+  const handleFontFamilyChange = (font: string) => {
+    updateFirestore({ fontFamily: font });
+  };
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow-2xl animate-in slide-in-from-bottom duration-300 pb-safe sm:left-14">
+      <div className="container mx-auto p-4 flex flex-col gap-6 max-w-4xl">
+        <div className="flex items-center justify-between border-b pb-2">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center text-primary">
+              {selectedItem.type === 'text' ? <Type className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </div>
+            <h3 className="font-headline font-bold text-lg capitalize">Edit {selectedItem.type}</h3>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full">
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Rotation Control */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <RotateCcw className="h-4 w-4" />
+                Rotation
+              </Label>
+              <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{rotation}°</span>
+            </div>
+            <Slider 
+              value={[rotation]} 
+              min={0} 
+              max={360} 
+              step={1}
+              onValueChange={handleRotationChange}
+              onValueCommit={handleRotationCommit}
+            />
+          </div>
+
+          {/* Scale Control */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <Maximize2 className="h-4 w-4" />
+                Size
+              </Label>
+              <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{scale.toFixed(1)}x</span>
+            </div>
+            <Slider 
+              value={[scale]} 
+              min={0.5} 
+              max={3.0} 
+              step={0.1}
+              onValueChange={handleScaleChange}
+              onValueCommit={handleScaleCommit}
+            />
+          </div>
+        </div>
+
+        {/* Text Specific Controls */}
+        {selectedItem.type === 'text' && (
+          <div className="flex flex-wrap items-center gap-6 pt-2 border-t mt-2">
+            <div className="flex items-center gap-2">
+               <Label className="text-xs font-medium text-muted-foreground">Font</Label>
+               <Select value={selectedItem.fontFamily || "font-serif"} onValueChange={handleFontFamilyChange}>
+                <SelectTrigger className="h-9 w-[130px] rounded-full">
+                  <SelectValue placeholder="Font" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="font-serif">Elegant Serif</SelectItem>
+                  <SelectItem value="font-sans">Modern Sans</SelectItem>
+                  <SelectItem value="font-mono">Clean Mono</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Label className="text-xs font-medium text-muted-foreground">Size</Label>
+              <div className="flex items-center gap-1 bg-muted/50 rounded-full p-1">
+                <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={() => adjustFontSize(-2)}>
+                  <Minus className="h-3 w-3" />
+                </Button>
+                <span className="text-xs font-bold w-6 text-center">{selectedItem.fontSize || 24}</span>
+                <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={() => adjustFontSize(2)}>
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 bg-muted/50 rounded-full p-1 ml-auto">
+              <Button 
+                size="icon" 
+                variant={selectedItem.isBold ? "default" : "ghost"} 
+                className="h-8 w-8 rounded-full"
+                onClick={toggleBold}
+              >
+                <Bold className="h-4 w-4" />
+              </Button>
+              <Button 
+                size="icon" 
+                variant={selectedItem.isUnderline ? "default" : "ghost"} 
+                className="h-8 w-8 rounded-full"
+                onClick={toggleUnderline}
+              >
+                <Underline className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

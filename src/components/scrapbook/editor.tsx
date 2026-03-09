@@ -5,6 +5,7 @@ import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
 import { Canvas } from "@/components/scrapbook/canvas";
 import { Toolbar } from "@/components/scrapbook/toolbar";
 import { PagePagination } from "@/components/scrapbook/page-pagination";
+import { EditingPanel } from "@/components/scrapbook/editing-panel";
 import { useState, useEffect } from "react";
 import { collection, doc, query, orderBy, setDoc, serverTimestamp, addDoc, updateDoc, increment } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,6 +22,7 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
   const { toast } = useToast();
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [localItems, setLocalItems] = useState<any[]>([]);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [isAddingPage, setIsAddingPage] = useState(false);
   const [direction, setDirection] = useState<'next' | 'prev' | null>(null);
   const [isFlipping, setIsFlipping] = useState(false);
@@ -65,11 +67,6 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
   const activePage = pages?.[activePageIndex];
   const activePageId = activePage?.id;
 
-  /**
-   * REAL-TIME SYNCHRONIZATION
-   * Fetch objects for the active page. This uses onSnapshot internally
-   * to ensure the UI updates instantly when any user adds or moves objects.
-   */
   const objectsQuery = useMemoFirebase(() => {
     if (!activePageId) return null;
     return collection(db, "scrapbooks", scrapbook.id, "pages", activePageId, "canvasObjects");
@@ -77,7 +74,6 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
 
   const { data: serverItems } = useCollection<any>(objectsQuery);
 
-  // Sync server items to local state for smooth interaction (Optimistic UI)
   useEffect(() => {
     if (serverItems) {
       setLocalItems(serverItems);
@@ -92,6 +88,7 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
 
   const handleNextPage = () => {
     if (pages && activePageIndex < pages.length - 1 && !isFlipping) {
+      setSelectedItemId(null); // Clear selection on page flip
       setDirection('next');
       setIsFlipping(true);
       setTimeout(() => {
@@ -103,6 +100,7 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
 
   const handlePrevPage = () => {
     if (activePageIndex > 0 && !isFlipping) {
+      setSelectedItemId(null); // Clear selection on page flip
       setDirection('prev');
       setIsFlipping(true);
       setTimeout(() => {
@@ -135,7 +133,6 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
       const docRef = await addDoc(pagesCol, newPageData);
       await setDoc(docRef, { ...newPageData, id: docRef.id }, { merge: true });
 
-      // Atomically increment the total page count
       updateDoc(scrapbookRef, {
         pageCount: increment(1),
         updatedAt: serverTimestamp()
@@ -146,7 +143,7 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
         description: `Created page ${nextNumber}.`,
       });
 
-      // Navigate to the new page with a flip
+      setSelectedItemId(null);
       setDirection('next');
       setIsFlipping(true);
       setTimeout(() => {
@@ -156,11 +153,6 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
       
     } catch (error) {
       console.error("Failed to add page", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Could not create a new page.",
-      });
     } finally {
       setIsAddingPage(false);
     }
@@ -175,9 +167,10 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
     );
   }
 
+  const selectedItem = localItems.find(i => i.id === selectedItemId);
+
   return (
-    <div className="flex flex-col h-full gap-4">
-      {/* Passing localItems to Toolbar for zIndex calculation */}
+    <div className="flex flex-col h-full gap-4 pb-32">
       <Toolbar 
         scrapbook={scrapbook} 
         pageId={activePageId} 
@@ -207,10 +200,21 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
             scrapbookId={scrapbook.id}
             pageId={activePageId}
             items={localItems} 
+            selectedItemId={selectedItemId}
+            onSelectItem={setSelectedItemId}
             onUpdateItemPosition={updateItemPositionLocal} 
           />
         </div>
       </div>
+
+      {selectedItem && (
+        <EditingPanel 
+          selectedItem={selectedItem}
+          scrapbookId={scrapbook.id}
+          pageId={activePageId}
+          onClose={() => setSelectedItemId(null)}
+        />
+      )}
     </div>
   );
 }
