@@ -213,11 +213,6 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
           
           addDocumentNonBlocking(objectsCol, objectData);
 
-          /**
-           * PERFORMANCE OPTIMIZATION (Denormalization):
-           * Instead of O(N) subcollection queries in the gallery, we denormalize
-           * the first image uploaded as the 'coverImage' for O(1) retrieval.
-           */
           if (type === 'image' && (!scrapbook.coverImage || scrapbook.coverImage === "")) {
             const scrapbookRef = doc(db, "scrapbooks", scrapbook.id);
             updateDocumentNonBlocking(scrapbookRef, {
@@ -430,7 +425,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
               Discard changes?
-            </AlertTriangle>
+            </AlertDialogTitle>
             <AlertDialogDescription>
               You haven't finalized this design yet. If you leave now, the scrapbook will remain in an unfinalized state. You can continue editing it later from the dashboard.
             </AlertDialogDescription>
