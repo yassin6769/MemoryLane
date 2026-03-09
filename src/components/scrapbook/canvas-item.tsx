@@ -37,6 +37,7 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
+  // Refs to store interaction snapshots to avoid jitter during bounding box shifts
   const interactionStart = useRef({ 
     clientX: 0, 
     clientY: 0, 
@@ -53,7 +54,6 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
   
   const hasMoved = useRef(false);
   const itemRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
   
   const db = getFirestore();
   const storage = useStorage();
@@ -62,7 +62,7 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>, mode: InteractionMode = 'drag') => {
     e.stopPropagation();
     
-    // Don't start dragging if we clicked a specific action button
+    // Prevent interaction if a specific utility button was clicked
     if ((e.target as HTMLElement).closest('.action-button') && mode === 'drag') return;
 
     setInteractionMode(mode);
@@ -71,7 +71,7 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     const rect = itemRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    // Use stable viewport coordinates for the center to avoid rotation-induced jitter
+    // Calculate the stable center point in viewport coordinates
     const vCenterX = rect.left + rect.width / 2;
     const vCenterY = rect.top + rect.height / 2;
 
@@ -103,19 +103,18 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     const parentRect = itemRef.current.parentElement?.getBoundingClientRect();
     if (!parentRect) return;
 
-    const vCenterX = interactionStart.current.vCenterX;
-    const vCenterY = interactionStart.current.vCenterY;
+    const { vCenterX, vCenterY, clientX: startClientX, clientY: startClientY, x: startX, y: startY, width: startW, height: startH, rotation: startR, dist: startDist, angle: startAngle } = interactionStart.current;
 
     if (interactionMode === 'drag') {
-      const dx = e.clientX - interactionStart.current.clientX;
-      const dy = e.clientY - interactionStart.current.clientY;
+      const dx = e.clientX - startClientX;
+      const dy = e.clientY - startClientY;
       
-      let newX = interactionStart.current.x + dx;
-      let newY = interactionStart.current.y + dy;
+      let newX = startX + dx;
+      let newY = startY + dy;
 
-      // Keep within bounds
-      newX = Math.max(0, Math.min(newX, parentRect.width - parseFloat(itemRef.current.style.width)));
-      newY = Math.max(0, Math.min(newY, parentRect.height - parseFloat(itemRef.current.style.height)));
+      // Bound to parent canvas dimensions
+      newX = Math.max(0, Math.min(newX, parentRect.width - startW));
+      newY = Math.max(0, Math.min(newY, parentRect.height - startH));
 
       itemRef.current.style.left = `${newX}px`;
       itemRef.current.style.top = `${newY}px`;
@@ -124,12 +123,13 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
       const dx = e.clientX - vCenterX;
       const dy = e.clientY - vCenterY;
       const currentDist = Math.sqrt(dx * dx + dy * dy);
-      const ratio = currentDist / interactionStart.current.dist;
+      const ratio = currentDist / startDist;
 
-      const newWidth = Math.max(50, interactionStart.current.width * ratio);
+      const newWidth = Math.max(50, startW * ratio);
+      // Maintain aspect ratio for media
       const newHeight = (item.type === 'video' || item.type === 'image')
-        ? (newWidth * interactionStart.current.height) / interactionStart.current.width
-        : Math.max(30, interactionStart.current.height * ratio);
+        ? (newWidth * startH) / startW
+        : Math.max(30, startH * ratio);
 
       itemRef.current.style.width = `${newWidth}px`;
       itemRef.current.style.height = `${newHeight}px`;
@@ -138,8 +138,8 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
       const dx = e.clientX - vCenterX;
       const dy = e.clientY - vCenterY;
       const currentAngle = Math.atan2(dy, dx);
-      const rotationDiff = (currentAngle - interactionStart.current.angle) * (180 / Math.PI);
-      const finalRotation = (interactionStart.current.rotation + rotationDiff) % 360;
+      const rotationDiff = (currentAngle - startAngle) * (180 / Math.PI);
+      const finalRotation = (startR + rotationDiff) % 360;
       
       itemRef.current.style.transform = `rotate(${finalRotation}deg)`;
     }
@@ -151,6 +151,7 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     window.removeEventListener("mousemove", handleMouseMove);
     window.removeEventListener("mouseup", handleMouseUp);
 
+    // If no movement occurred, toggle selection
     if (!hasMoved.current) {
       setIsSelected(!isSelected);
       return;
@@ -278,9 +279,8 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
           zIndex: interactionMode ? 9999 : (item.zIndex || 1),
         }}
       >
-        {/* Layer A (Content) */}
+        {/* Layer A (Content): Receives flips/scaling */}
         <div 
-          ref={contentRef}
           className="w-full h-full pointer-events-none"
           style={{
             transform: `scaleX(${item.scaleX || 1}) scaleY(${item.scaleY || 1})`,
@@ -290,7 +290,7 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
           {renderContent()}
         </div>
 
-        {/* Layer B (Controls) */}
+        {/* Layer B (Controls): Stay static relative to bounds */}
         {isSelected && (
           <div className="absolute inset-0 pointer-events-none">
             {/* ROTATION HANDLE */}
