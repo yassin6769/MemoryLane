@@ -37,7 +37,6 @@ import { CollaboratorDialog } from "../scrapbook/collaborator-dialog";
 import { useFirestore } from "@/firebase";
 import { deleteScrapbook } from "@/data/scrapbooks";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
 
 interface ScrapbookCardProps {
   scrapbook: any;
@@ -52,8 +51,7 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // Robust fix for Radix UI body lock: ensure pointer events are restored 
-  // if any modal state changes or if the menu closes.
+  // Robust check to ensure pointer events are always restored when modals close
   useEffect(() => {
     if (!isMenuOpen && !isDeleteDialogOpen && !isShareOpen) {
       document.body.style.pointerEvents = "auto";
@@ -152,11 +150,6 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
                 <AvatarFallback className="bg-primary/5 text-primary text-[10px]">U</AvatarFallback>
               </Avatar>
             ))}
-            {Object.keys(scrapbook.members || {}).length > 3 && (
-              <div className="h-8 w-8 rounded-full bg-muted border-2 border-background flex items-center justify-center text-[10px] font-bold text-muted-foreground">
-                +{Object.keys(scrapbook.members || {}).length - 3}
-              </div>
-            )}
           </div>
 
           <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
@@ -185,8 +178,7 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
                 onSelect={(e) => {
                   e.preventDefault();
                   setIsMenuOpen(false);
-                  // Use a slightly longer timeout to ensure menu is fully closed and body lock is potentially cleared
-                  setTimeout(() => setIsShareOpen(true), 200);
+                  setTimeout(() => setIsShareOpen(true), 150);
                 }} 
                 className="flex items-center gap-2"
               >
@@ -198,7 +190,7 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
                 onSelect={(e) => {
                   e.preventDefault();
                   setIsMenuOpen(false);
-                  setTimeout(() => setIsDeleteDialogOpen(true), 200);
+                  setTimeout(() => setIsDeleteDialogOpen(true), 150);
                 }}
                 className="text-destructive focus:text-destructive flex items-center gap-2"
               >
@@ -210,7 +202,6 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
         </CardFooter>
       </Card>
 
-      {/* Render Dialogs outside the Card to avoid parent transition/transform issues */}
       {isShareOpen && (
         <CollaboratorDialog 
           scrapbook={scrapbook} 
