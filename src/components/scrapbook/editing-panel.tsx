@@ -15,7 +15,8 @@ import {
   Plus,
   Minus,
   BringToFront,
-  SendToBack
+  SendToBack,
+  Square
 } from "lucide-react";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import {
@@ -26,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 interface EditingPanelProps {
   selectedItem: any;
@@ -42,18 +44,18 @@ export function EditingPanel({ selectedItem, allItems, scrapbookId, pageId, onCl
   // Local state for sliders to allow smooth dragging before Firestore update
   const [rotation, setRotation] = useState(selectedItem.rotation || 0);
   const [scale, setScale] = useState(Math.abs(selectedItem.scaleX || 1));
+  const [borderWidth, setBorderWidth] = useState(selectedItem.borderWidth || 0);
 
   useEffect(() => {
     setRotation(selectedItem.rotation || 0);
     setScale(Math.abs(selectedItem.scaleX || 1));
-  }, [selectedItem.id, selectedItem.rotation, selectedItem.scaleX]);
+    setBorderWidth(selectedItem.borderWidth || 0);
+  }, [selectedItem.id, selectedItem.rotation, selectedItem.scaleX, selectedItem.borderWidth]);
 
   const handleRotationChange = (val: number[]) => {
     const newRotation = val[0];
     setRotation(newRotation);
-    // 1. Instant UI Feedback (Live Preview)
     onLiveUpdate(selectedItem.id, { rotation: newRotation });
-    // 2. Debounced Firestore Sync (Silent Write)
     debouncedUpdate(scrapbookId, pageId, selectedItem.id, { rotation: newRotation });
   };
 
@@ -65,10 +67,20 @@ export function EditingPanel({ selectedItem, allItems, scrapbookId, pageId, onCl
       scaleX: newScale * (isFlipped ? -1 : 1),
       scaleY: newScale
     };
-    // 1. Instant UI Feedback (Live Preview)
     onLiveUpdate(selectedItem.id, updates);
-    // 2. Debounced Firestore Sync (Silent Write)
     debouncedUpdate(scrapbookId, pageId, selectedItem.id, updates);
+  };
+
+  const handleBorderWidthChange = (val: number[]) => {
+    const newWidth = val[0];
+    setBorderWidth(newWidth);
+    onLiveUpdate(selectedItem.id, { borderWidth: newWidth });
+    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { borderWidth: newWidth });
+  };
+
+  const handleBorderColorChange = (color: string) => {
+    onLiveUpdate(selectedItem.id, { borderColor: color });
+    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { borderColor: color });
   };
 
   const bringToFront = () => {
@@ -109,6 +121,15 @@ export function EditingPanel({ selectedItem, allItems, scrapbookId, pageId, onCl
     onLiveUpdate(selectedItem.id, { fontFamily: font });
     debouncedUpdate(scrapbookId, pageId, selectedItem.id, { fontFamily: font });
   };
+
+  const colors = [
+    { name: "White", value: "#FFFFFF" },
+    { name: "Black", value: "#000000" },
+    { name: "Primary", value: "hsl(35, 83%, 71%)" },
+    { name: "Red", value: "#ef4444" },
+    { name: "Blue", value: "#3b82f6" },
+    { name: "Green", value: "#22c55e" },
+  ];
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t shadow-2xl animate-in slide-in-from-bottom duration-300 pb-safe sm:left-14">
@@ -151,40 +172,85 @@ export function EditingPanel({ selectedItem, allItems, scrapbookId, pageId, onCl
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Rotation Control */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <RotateCcw className="h-4 w-4" />
-                Rotation
-              </Label>
-              <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{rotation}°</span>
+          {/* Transformation Controls */}
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <RotateCcw className="h-4 w-4" />
+                  Rotation
+                </Label>
+                <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{rotation}°</span>
+              </div>
+              <Slider 
+                value={[rotation]} 
+                min={0} 
+                max={360} 
+                step={1}
+                onValueChange={handleRotationChange}
+              />
             </div>
-            <Slider 
-              value={[rotation]} 
-              min={0} 
-              max={360} 
-              step={1}
-              onValueChange={handleRotationChange}
-            />
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <Maximize2 className="h-4 w-4" />
+                  Size
+                </Label>
+                <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{scale.toFixed(1)}x</span>
+              </div>
+              <Slider 
+                value={[scale]} 
+                min={0.5} 
+                max={3.0} 
+                step={0.1}
+                onValueChange={handleScaleChange}
+              />
+            </div>
           </div>
 
-          {/* Scale Control */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <Maximize2 className="h-4 w-4" />
-                Size
-              </Label>
-              <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{scale.toFixed(1)}x</span>
+          {/* Border Controls */}
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <Square className="h-4 w-4" />
+                  Border Thickness
+                </Label>
+                <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{borderWidth}px</span>
+              </div>
+              <Slider 
+                value={[borderWidth]} 
+                min={0} 
+                max={20} 
+                step={1}
+                onValueChange={handleBorderWidthChange}
+              />
             </div>
-            <Slider 
-              value={[scale]} 
-              min={0.5} 
-              max={3.0} 
-              step={0.1}
-              onValueChange={handleScaleChange}
-            />
+
+            <div className="space-y-3">
+              <Label className="text-xs font-medium text-muted-foreground">Border Color</Label>
+              <div className="flex flex-wrap gap-2">
+                {colors.map((color) => (
+                  <TooltipProvider key={color.value}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => handleBorderColorChange(color.value)}
+                          className={cn(
+                            "h-7 w-7 rounded-full border border-muted transition-transform hover:scale-110",
+                            selectedItem.borderColor === color.value && "ring-2 ring-primary ring-offset-2"
+                          )}
+                          style={{ backgroundColor: color.value }}
+                          aria-label={`Select ${color.name}`}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent>{color.name}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 

@@ -205,6 +205,8 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
             scaleX: 1,
             scaleY: 1,
             zIndex: nextZIndex,
+            borderWidth: 0,
+            borderColor: "#000000",
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           };
@@ -212,7 +214,6 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
           addDocumentNonBlocking(objectsCol, objectData);
 
           // PERFORMANCE OPTIMIZATION: Denormalize coverImage
-          // If this is the first image added, promote it to the scrapbook's cover
           if (type === 'image' && (!scrapbook.coverImage || scrapbook.coverImage === "")) {
             const scrapbookRef = doc(db, "scrapbooks", scrapbook.id);
             updateDocumentNonBlocking(scrapbookRef, {
@@ -253,6 +254,8 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       isUnderline: false,
       fontSize: 24,
       fontFamily: "font-serif",
+      borderWidth: 0,
+      borderColor: "#000000",
       members: scrapbook.members,
       x: 150,
       y: 150,

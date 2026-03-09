@@ -70,6 +70,8 @@
         "isUnderline": { "type": "boolean" },
         "fontSize": { "type": "number", "default": 24 },
         "fontFamily": { "type": "string", "enum": ["font-serif", "font-sans", "font-mono"], "default": "font-serif" },
+        "borderWidth": { "type": "number", "default": 0 },
+        "borderColor": { "type": "string", "default": "#000000" },
         "x": { "type": "number" },
         "y": { "type": "number" },
         "width": { "type": "number" },

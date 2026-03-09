@@ -145,10 +145,20 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
   };
 
   const renderContent = () => {
+    const contentStyles = {
+      borderWidth: `${item.borderWidth || 0}px`,
+      borderColor: item.borderColor || '#000000',
+      borderStyle: item.borderWidth > 0 ? 'solid' : 'none',
+      padding: `${item.borderWidth || 0}px`,
+    };
+
     switch (item.type) {
       case "image":
         return (
-          <div className="relative w-full h-full overflow-hidden rounded-sm pointer-events-none select-none">
+          <div 
+            className="relative w-full h-full overflow-hidden rounded-sm pointer-events-none select-none bg-white"
+            style={contentStyles}
+          >
             <Image
               src={item.mediaUri}
               alt="Memory"
@@ -160,7 +170,10 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
         );
       case "text":
         return (
-          <div className="w-full h-full p-4 flex items-center justify-center pointer-events-none bg-white/20 rounded-lg overflow-hidden">
+          <div 
+            className="w-full h-full p-4 flex items-center justify-center pointer-events-none bg-white/20 rounded-lg overflow-hidden"
+            style={contentStyles}
+          >
             <p className={cn(
               "text-center leading-tight text-foreground/80 whitespace-pre-wrap",
               item.fontFamily || "font-serif",
@@ -175,7 +188,10 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
         );
       case "video":
         return (
-          <div className="relative w-full h-full pointer-events-none rounded-sm bg-black overflow-hidden">
+          <div 
+            className="relative w-full h-full pointer-events-none rounded-sm bg-black overflow-hidden"
+            style={contentStyles}
+          >
             <video 
               src={item.mediaUri} 
               className="w-full h-full object-cover"
@@ -185,7 +201,10 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
         );
       case "audio":
         return (
-          <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-primary/5 rounded-lg border border-primary/20 pointer-events-none shadow-sm">
+          <div 
+            className="w-full h-full flex flex-col items-center justify-center p-4 bg-primary/5 rounded-lg border border-primary/20 pointer-events-none shadow-sm"
+            style={contentStyles}
+          >
             <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center mb-2 shadow-sm">
               <div className="w-4 h-4 bg-white rounded-full animate-pulse" />
             </div>
