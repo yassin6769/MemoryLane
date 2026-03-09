@@ -55,21 +55,13 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
   const storage = useStorage();
   const { toast } = useToast();
 
-  /**
-   * UNIFIED GESTURE HANDLER
-   * Determines mode based on the target handle or body.
-   */
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>, mode: InteractionMode = 'drag') => {
-    // Stop event propagation to prevent multiple items from being selected/moved
     e.stopPropagation();
-    
-    // Check if we clicked an action button within the overlay
     if ((e.target as HTMLElement).closest('.action-button')) return;
 
     setInteractionMode(mode);
     hasMoved.current = false;
 
-    // Calculate center for rotation reference
     const rect = itemRef.current?.getBoundingClientRect();
     const centerX = rect ? rect.left + rect.width / 2 : 0;
     const centerY = rect ? rect.top + rect.height / 2 : 0;
@@ -89,10 +81,6 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     window.addEventListener("mouseup", handleMouseUp);
   };
 
-  /**
-   * HIGH-PERFORMANCE LOCAL UPDATES
-   * Direct DOM manipulation of the element's style for 60fps interaction.
-   */
   const handleMouseMove = (e: globalThis.MouseEvent) => {
     if (!interactionMode) return;
     hasMoved.current = true;
@@ -106,11 +94,12 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
       if (itemRef.current) {
         itemRef.current.style.left = `${newX}px`;
         itemRef.current.style.top = `${newY}px`;
+        // Maintain rotation and add lift scale
+        itemRef.current.style.transform = `rotate(${item.rotation || 0}deg) scale(1.02)`;
       }
     } 
     else if (interactionMode === 'resize') {
       const newWidth = Math.max(50, interactionStart.current.width + dx);
-      // Maintain aspect ratio for media
       const newHeight = (item.type === 'video' || item.type === 'image')
         ? (newWidth * interactionStart.current.height) / interactionStart.current.width
         : Math.max(30, interactionStart.current.height + dy);
@@ -129,22 +118,23 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
       const finalRotation = interactionStart.current.rotation + rotationDiff;
       
       if (itemRef.current) {
-        itemRef.current.style.transform = `rotate(${finalRotation}deg) scaleX(${item.scaleX || 1}) scaleY(${item.scaleY || 1})`;
+        // Apply rotation only to parent container
+        itemRef.current.style.transform = `rotate(${finalRotation}deg)`;
       }
     }
   };
 
-  /**
-   * FIRESTORE PERSISTENCE
-   * Sync final state to the database only when the user releases the object.
-   */
   const handleMouseUp = (e: globalThis.MouseEvent) => {
     const finalMode = interactionMode;
     setInteractionMode(null);
     window.removeEventListener("mousemove", handleMouseMove);
     window.removeEventListener("mouseup", handleMouseUp);
 
-    // If no movement happened, it's a selection toggle
+    // Reset visual lift transform to base rotation
+    if (itemRef.current) {
+      itemRef.current.style.transform = `rotate(${item.rotation || 0}deg)`;
+    }
+
     if (!hasMoved.current) {
       setIsSelected(!isSelected);
       return;
@@ -159,7 +149,6 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     if (finalMode === 'drag') {
       updates.x = interactionStart.current.x + dx;
       updates.y = interactionStart.current.y + dy;
-      // Sync parent state for immediate re-render if necessary
       onUpdatePosition(item.id, updates.x, updates.y);
     } 
     else if (finalMode === 'resize') {
@@ -263,7 +252,7 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
         onMouseDown={(e) => handleMouseDown(e, 'drag')}
         className={cn(
           "absolute transition-shadow duration-300 transform-gpu select-none",
-          interactionMode === 'drag' ? "cursor-grabbing shadow-2xl scale-[1.02] z-[9999]" : "cursor-grab shadow-md hover:shadow-lg",
+          interactionMode === 'drag' ? "cursor-grabbing shadow-2xl z-[9999]" : "cursor-grab shadow-md hover:shadow-lg",
           isSelected ? "ring-2 ring-primary ring-offset-2 z-[999]" : "",
           item.type === "text" ? "bg-transparent" : "bg-white p-2 border border-muted/30 rounded-sm"
         )}
@@ -272,14 +261,23 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
           top: `${item.y}px`,
           width: `${item.width}px`,
           height: `${item.height}px`,
-          transform: `rotate(${item.rotation || 0}deg) scaleX(${item.scaleX || 1}) scaleY(${item.scaleY || 1})`,
+          transform: `rotate(${item.rotation || 0}deg)`,
           transformOrigin: 'center center',
           zIndex: interactionMode ? 9999 : (item.zIndex || 1),
         }}
       >
-        {renderContent()}
+        {/* Layer A (Content): Receives scale transformations only */}
+        <div 
+          className="w-full h-full pointer-events-none"
+          style={{
+            transform: `scaleX(${item.scaleX || 1}) scaleY(${item.scaleY || 1})`,
+            transformOrigin: 'center center'
+          }}
+        >
+          {renderContent()}
+        </div>
 
-        {/* TRANSFORMATION OVERLAY (Visible on selection) */}
+        {/* Layer B (Controls): Static scale, anchored UI */}
         {isSelected && (
           <>
             {/* ROTATION HANDLE (TOP) */}
@@ -293,41 +291,37 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
               </Button>
             </div>
 
-            {/* RESIZE HANDLE (BOTTOM RIGHT) */}
+            {/* DELETE BUTTON (TOP-RIGHT) */}
+            <Button 
+              variant="destructive" 
+              size="icon" 
+              className="absolute -top-4 -right-4 h-8 w-8 rounded-full shadow-lg action-button z-[102]"
+              onClick={(e) => { e.stopPropagation(); setIsDeleteDialogOpen(true); }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+
+            {/* FLIP BUTTON (BOTTOM-RIGHT) */}
+            <Button 
+              variant="secondary" 
+              size="icon" 
+              className="absolute -bottom-4 -right-4 h-8 w-8 rounded-full shadow-lg action-button z-[102]"
+              onClick={handleFlip}
+            >
+              <FlipHorizontal className="h-4 w-4" />
+            </Button>
+
+            {/* RESIZE HANDLE (INSIDE BOTTOM RIGHT) */}
             <div 
               onMouseDown={(e) => handleMouseDown(e, 'resize')}
-              className="absolute -bottom-2 -right-2 h-7 w-7 bg-white border-2 border-primary rounded-sm cursor-nwse-resize shadow-sm z-[100] flex items-center justify-center active:bg-primary group transition-colors"
+              className="absolute bottom-2 right-2 h-7 w-7 bg-white/80 backdrop-blur-sm border-2 border-primary rounded-sm cursor-nwse-resize shadow-sm z-[100] flex items-center justify-center active:bg-primary group transition-colors"
             >
               <Maximize2 className="h-4 w-4 text-primary group-active:text-white" />
-            </div>
-
-            {/* QUICK ACTIONS (BOTTOM) */}
-            <div className="absolute -bottom-14 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-white/95 backdrop-blur-md border p-1 rounded-full shadow-xl action-button z-[101]">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-9 w-9 rounded-full hover:bg-muted"
-                onClick={handleFlip}
-                title="Flip Horizontal"
-              >
-                <FlipHorizontal className="h-5 w-5" />
-              </Button>
-              <div className="w-px h-6 bg-muted mx-1" />
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-9 w-9 rounded-full text-destructive hover:bg-destructive/10"
-                onClick={(e) => { e.stopPropagation(); setIsDeleteDialogOpen(true); }}
-                title="Remove Memory"
-              >
-                <Trash2 className="h-5 w-5" />
-              </Button>
             </div>
           </>
         )}
       </div>
 
-      {/* DELETION CONFIRMATION */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
