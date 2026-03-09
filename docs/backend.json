@@ -66,6 +66,8 @@
         "type": { "type": "string", "enum": ["image", "video", "audio", "text"] },
         "mediaUri": { "type": "string", "format": "uri" },
         "text": { "type": "string" },
+        "isBold": { "type": "boolean" },
+        "isUnderline": { "type": "boolean" },
         "x": { "type": "number" },
         "y": { "type": "number" },
         "width": { "type": "number" },

@@ -8,7 +8,7 @@ import { updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase
 import { doc, getFirestore, serverTimestamp } from "firebase/firestore";
 import { ref, deleteObject } from "firebase/storage";
 import { useStorage } from "@/firebase";
-import { Trash2, AlertTriangle, RotateCcw, FlipHorizontal, Maximize2, Move } from "lucide-react";
+import { Trash2, AlertTriangle, RotateCcw, FlipHorizontal, Maximize2, Move, Bold, Underline } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -37,7 +37,6 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
-  // Refs to store interaction snapshots to avoid jitter during bounding box shifts
   const interactionStart = useRef({ 
     clientX: 0, 
     clientY: 0, 
@@ -62,7 +61,6 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>, mode: InteractionMode = 'drag') => {
     e.stopPropagation();
     
-    // Prevent interaction if a specific utility button was clicked
     if ((e.target as HTMLElement).closest('.action-button') && mode === 'drag') return;
 
     setInteractionMode(mode);
@@ -71,7 +69,6 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     const rect = itemRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    // Calculate the stable center point in viewport coordinates
     const vCenterX = rect.left + rect.width / 2;
     const vCenterY = rect.top + rect.height / 2;
 
@@ -112,7 +109,6 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
       let newX = startX + dx;
       let newY = startY + dy;
 
-      // Bound to parent canvas dimensions
       newX = Math.max(0, Math.min(newX, parentRect.width - startW));
       newY = Math.max(0, Math.min(newY, parentRect.height - startH));
 
@@ -126,7 +122,6 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
       const ratio = currentDist / startDist;
 
       const newWidth = Math.max(50, startW * ratio);
-      // Maintain aspect ratio for media
       const newHeight = (item.type === 'video' || item.type === 'image')
         ? (newWidth * startH) / startW
         : Math.max(30, startH * ratio);
@@ -151,7 +146,6 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     window.removeEventListener("mousemove", handleMouseMove);
     window.removeEventListener("mouseup", handleMouseUp);
 
-    // If no movement occurred, toggle selection
     if (!hasMoved.current) {
       setIsSelected(!isSelected);
       return;
@@ -192,6 +186,24 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     toast({ title: "Memory Flipped" });
   };
 
+  const handleToggleBold = () => {
+    const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", item.id);
+    updateDocumentNonBlocking(docRef, {
+      isBold: !item.isBold,
+      updatedAt: serverTimestamp()
+    });
+    toast({ title: !item.isBold ? "Bold Applied" : "Bold Removed" });
+  };
+
+  const handleToggleUnderline = () => {
+    const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", item.id);
+    updateDocumentNonBlocking(docRef, {
+      isUnderline: !item.isUnderline,
+      updatedAt: serverTimestamp()
+    });
+    toast({ title: !item.isUnderline ? "Underline Applied" : "Underline Removed" });
+  };
+
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
@@ -229,7 +241,11 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
       case "text":
         return (
           <div className="w-full h-full p-4 flex items-center justify-center pointer-events-none bg-white/40 backdrop-blur-[2px] rounded-lg border border-dashed border-primary/20">
-            <p className="text-2xl font-headline text-center leading-tight text-foreground/80">
+            <p className={cn(
+              "text-2xl font-headline text-center leading-tight text-foreground/80",
+              item.isBold && "font-bold",
+              item.isUnderline && "underline"
+            )}>
               {item.text}
             </p>
           </div>
@@ -279,7 +295,6 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
           zIndex: interactionMode ? 9999 : (item.zIndex || 1),
         }}
       >
-        {/* Layer A (Content): Receives flips/scaling */}
         <div 
           className="w-full h-full pointer-events-none"
           style={{
@@ -290,10 +305,32 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
           {renderContent()}
         </div>
 
-        {/* Layer B (Controls): Stay static relative to bounds */}
         {isSelected && (
           <div className="absolute inset-0 pointer-events-none">
-            {/* ROTATION HANDLE */}
+            {/* TEXT FORMATTING TOOLBAR */}
+            {item.type === 'text' && (
+              <div className="absolute -top-24 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-primary/20 rounded-full p-1 shadow-lg pointer-events-auto z-[110] action-button">
+                <Button 
+                  size="icon" 
+                  variant={item.isBold ? "default" : "ghost"} 
+                  className="h-8 w-8 rounded-full hover:bg-primary/10"
+                  onClick={(e) => { e.stopPropagation(); handleToggleBold(); }}
+                  title="Bold"
+                >
+                  <Bold className="h-4 w-4" />
+                </Button>
+                <Button 
+                  size="icon" 
+                  variant={item.isUnderline ? "default" : "ghost"} 
+                  className="h-8 w-8 rounded-full hover:bg-primary/10"
+                  onClick={(e) => { e.stopPropagation(); handleToggleUnderline(); }}
+                  title="Underline"
+                >
+                  <Underline className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+
             <div 
               onMouseDown={(e) => handleMouseDown(e, 'rotate')}
               className="absolute -top-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 cursor-alias group pointer-events-auto z-[100]"
@@ -304,7 +341,6 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
               </Button>
             </div>
 
-            {/* DELETE BUTTON */}
             <Button 
               variant="destructive" 
               size="icon" 
@@ -314,7 +350,6 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
               <Trash2 className="h-4 w-4" />
             </Button>
 
-            {/* FLIP BUTTON */}
             <Button 
               variant="secondary" 
               size="icon" 
@@ -324,7 +359,6 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
               <FlipHorizontal className="h-4 w-4" />
             </Button>
 
-            {/* RESIZE HANDLE */}
             <div 
               onMouseDown={(e) => handleMouseDown(e, 'resize')}
               className="absolute -bottom-4 -right-4 h-8 w-8 bg-white border-2 border-primary rounded-full cursor-nwse-resize shadow-lg pointer-events-auto z-[100] flex items-center justify-center active:bg-primary group transition-colors"
@@ -332,7 +366,6 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
               <Maximize2 className="h-4 w-4 text-primary group-active:text-white" />
             </div>
 
-            {/* DRAG FEEDBACK */}
             <div className="absolute inset-4 border border-dashed border-primary/20 flex items-center justify-center rounded-md bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity">
               <Move className="h-6 w-6 text-primary/40" />
             </div>

@@ -67,7 +67,6 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
   const [currentMediaType, setCurrentMediaType] = useState<'image' | 'video' | 'audio' | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
-  // Audio Recording State
   const [isRecording, setIsRecording] = useState(false);
   const [recorder, setRecorder] = useState<MediaRecorder | null>(null);
 
@@ -106,7 +105,6 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
   };
 
   const handleMediaClick = (type: 'image' | 'video' | 'audio') => {
-    console.log(`[Toolbar] Media selection initiated for type: ${type}`);
     setCurrentMediaType(type);
     setTimeout(() => {
         fileInputRef.current?.click();
@@ -114,7 +112,6 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
   };
 
   const startRecording = async () => {
-    console.log("[Toolbar] Attempting to start audio recording...");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -125,7 +122,6 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       };
 
       mediaRecorder.onstop = async () => {
-        console.log("[Toolbar] Recording stopped. Preparing upload...");
         const audioBlob = new Blob(chunks, { type: 'audio/webm' });
         await uploadMediaBlob(audioBlob, 'voice_memo.webm', 'audio');
         stream.getTracks().forEach(track => track.stop());
@@ -139,7 +135,6 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         description: "Speak clearly into your microphone.",
       });
     } catch (err) {
-      console.error("[Toolbar] Microphone access error:", err);
       toast({
         variant: "destructive",
         title: "Mic Access Denied",
@@ -155,33 +150,23 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     }
   };
 
-  /**
-   * ROBUST MEDIA UPLOAD LOGIC
-   * Handles Storage upload, Progress monitoring, and Firestore metadata writing.
-   */
   const uploadMediaBlob = async (blob: Blob | File, fileName: string, type: 'image' | 'video' | 'audio') => {
-    console.log(`[MediaUpload] Starting upload process for ${fileName} (${type})`);
-    
-    // SAFETY CHECK: Verify Storage Initialization
     if (!storage || !storage.app.options.storageBucket) {
-        console.error("[MediaUpload] Firebase Error: Storage Bucket not found. Check firebase/config.ts");
         toast({ 
             variant: "destructive", 
             title: "Configuration Error", 
-            description: "Firebase Storage is not properly initialized. Default bucket is missing." 
+            description: "Firebase Storage is not properly initialized." 
         });
         return;
     }
 
     if (!user) {
-      console.error("[MediaUpload] Failed: User not authenticated.");
       toast({ variant: "destructive", title: "Upload Failed", description: "You must be logged in to upload media." });
       return;
     }
 
     if (!pageId) {
-      console.error("[MediaUpload] Failed: No active Page ID found.");
-      toast({ variant: "destructive", title: "Upload Failed", description: "No active page selected for this canvas." });
+      toast({ variant: "destructive", title: "Upload Failed", description: "No active page selected." });
       return;
     }
     
@@ -190,46 +175,21 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
     try {
       const storagePath = `scrapbooks/${scrapbook.id}/pages/${pageId}/${Date.now()}_${fileName}`;
-      console.log(`[MediaUpload] Target Storage Path: ${storagePath}`);
-      
       const storageRef = ref(storage, storagePath);
       const uploadTask = uploadBytesResumable(storageRef, blob);
 
       uploadTask.on('state_changed', 
         (snapshot) => {
           const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          console.log(`[MediaUpload] Progress: ${Math.round(progress)}%`);
           setUploadProgress(progress);
         }, 
         (error: StorageError) => {
-          console.error("[MediaUpload] Firebase Storage Error:", error.code, error.message);
           setUploadProgress(null);
-          
-          let errorMessage = "Could not upload media.";
-          if (error.code === 'storage/unauthorized') {
-            errorMessage = "Permission Denied: Check your storage security rules.";
-          } else if (error.code === 'storage/quota-exceeded') {
-            errorMessage = "Storage quota exceeded. Please contact support.";
-          } else if (error.code === 'storage/canceled') {
-            errorMessage = "Upload was canceled by the user.";
-          } else if (error.code === 'storage/no-default-bucket') {
-            errorMessage = "Storage Bucket not found. Check your configuration.";
-          }
-
-          toast({ 
-            variant: "destructive", 
-            title: "Upload Failed", 
-            description: errorMessage 
-          });
+          toast({ variant: "destructive", title: "Upload Failed", description: error.message });
         }, 
         async () => {
-          console.log("[MediaUpload] Storage upload complete. Fetching Download URL...");
           const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-          console.log(`[MediaUpload] Download URL retrieved: ${downloadUrl}`);
-
           const objectsCol = collection(db, "scrapbooks", scrapbook.id, "pages", pageId, "canvasObjects");
-          
-          // Calculate next zIndex
           const nextZIndex = items.length > 0 ? Math.max(...items.map((i: any) => i.zIndex || 0)) + 1 : 1;
 
           const objectData = {
@@ -248,57 +208,28 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           };
-
-          console.log("[MediaUpload] Writing metadata to Firestore:", objectData);
           
           addDocumentNonBlocking(objectsCol, objectData);
-
           setUploadProgress(null);
           toast({ title: "Success", description: `${type} added to your canvas.` });
         }
       );
     } catch (err: any) {
-      console.error("[MediaUpload] Unexpected process failure:", err);
       setUploadProgress(null);
-      toast({ 
-        variant: "destructive", 
-        title: "Process Failed", 
-        description: err.message || "An unexpected error occurred during processing." 
-      });
+      toast({ variant: "destructive", title: "Process Failed", description: err.message });
     }
   };
 
   const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) {
-        console.warn("[Toolbar] onFileChange triggered but no file selected.");
-        return;
-    }
-    
-    if (!currentMediaType) {
-        console.error("[Toolbar] onFileChange triggered but currentMediaType is null.");
-        return;
-    }
-
-    console.log(`[Toolbar] File selected: ${file.name}, Size: ${file.size} bytes`);
+    if (!file || !currentMediaType) return;
     await uploadMediaBlob(file, file.name, currentMediaType);
-    
-    // Reset input value to allow selecting the same file again if needed
     e.target.value = '';
   };
 
   const saveText = () => {
-    if (!textInput.trim()) {
-        toast({ variant: "destructive", title: "Invalid Input", description: "Please enter some text." });
-        return;
-    }
-    
-    if (!pageId) {
-        toast({ variant: "destructive", title: "Error", description: "No active page found." });
-        return;
-    }
-
-    console.log(`[Toolbar] Saving text object: "${textInput}"`);
+    if (!textInput.trim()) return;
+    if (!pageId) return;
 
     const objectsCol = collection(db, "scrapbooks", scrapbook.id, "pages", pageId, "canvasObjects");
     const nextZIndex = items.length > 0 ? Math.max(...items.map((i: any) => i.zIndex || 0)) + 1 : 1;
@@ -307,6 +238,8 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       pageId,
       type: "text",
       text: textInput,
+      isBold: false,
+      isUnderline: false,
       members: scrapbook.members,
       x: 150,
       y: 150,
