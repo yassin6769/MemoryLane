@@ -6,6 +6,7 @@ import { Canvas } from "@/components/scrapbook/canvas";
 import { Toolbar } from "@/components/scrapbook/toolbar";
 import { PagePagination } from "@/components/scrapbook/page-pagination";
 import { EditingPanel } from "@/components/scrapbook/editing-panel";
+import { SaveIndicator } from "@/components/scrapbook/save-indicator";
 import { useState, useEffect } from "react";
 import { collection, doc, query, orderBy, setDoc, serverTimestamp, addDoc, updateDoc, increment } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -171,11 +172,16 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
 
   return (
     <div className="flex flex-col h-full gap-4 pb-32">
-      <Toolbar 
-        scrapbook={scrapbook} 
-        pageId={activePageId} 
-        items={localItems} 
-      />
+      <div className="flex items-center justify-between">
+        <Toolbar 
+          scrapbook={scrapbook} 
+          pageId={activePageId} 
+          items={localItems} 
+        />
+        <div className="hidden sm:block">
+          <SaveIndicator />
+        </div>
+      </div>
       
       <div className="flex-grow flex flex-col gap-4 perspective-1000">
         <PagePagination 
@@ -205,6 +211,10 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
             onUpdateItemPosition={updateItemPositionLocal} 
           />
         </div>
+      </div>
+
+      <div className="sm:hidden fixed top-20 right-4 z-[60]">
+        <SaveIndicator />
       </div>
 
       {selectedItem && (

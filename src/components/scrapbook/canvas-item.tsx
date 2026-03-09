@@ -4,12 +4,13 @@
 import { useState, useRef, type MouseEvent, useEffect } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { doc, getFirestore, serverTimestamp } from "firebase/firestore";
+import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { doc, getFirestore } from "firebase/firestore";
 import { ref, deleteObject } from "firebase/storage";
 import { useStorage } from "@/firebase";
-import { Trash2, AlertTriangle, FlipHorizontal, Move } from "lucide-react";
+import { Trash2, FlipHorizontal, Move } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAutoSave } from "@/hooks/use-auto-save";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,6 +50,7 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
   const db = getFirestore();
   const storage = useStorage();
   const { toast } = useToast();
+  const { debouncedUpdate } = useAutoSave();
 
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
@@ -87,7 +89,7 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
     let newY = startY + dy;
 
     // Boundary constraints
-    newX = Math.max(0, Math.min(newX, parentRect.width - (item.width * (item.scaleX || 1))));
+    newX = Math.max(0, Math.min(newX, parentRect.width - (item.width * (Math.abs(item.scaleX) || 1))));
     newY = Math.max(0, Math.min(newY, parentRect.height - (item.height * (item.scaleY || 1))));
 
     itemRef.current.style.left = `${newX}px`;
@@ -106,20 +108,17 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
     
     onUpdatePosition(item.id, finalX, finalY);
 
-    const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", item.id);
-    updateDocumentNonBlocking(docRef, {
+    // Auto-save the final position
+    debouncedUpdate(scrapbookId, pageId, item.id, {
       x: finalX,
-      y: finalY,
-      updatedAt: serverTimestamp()
+      y: finalY
     });
   };
 
   const handleFlip = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", item.id);
-    updateDocumentNonBlocking(docRef, {
-      scaleX: (item.scaleX || 1) * -1,
-      updatedAt: serverTimestamp()
+    debouncedUpdate(scrapbookId, pageId, item.id, {
+      scaleX: (item.scaleX || 1) * -1
     });
   };
 
@@ -163,7 +162,7 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
         return (
           <div className="w-full h-full p-4 flex items-center justify-center pointer-events-none bg-white/20 rounded-lg overflow-hidden">
             <p className={cn(
-              "text-center leading-tight text-foreground/80",
+              "text-center leading-tight text-foreground/80 whitespace-pre-wrap",
               item.fontFamily || "font-serif",
               item.isBold && "font-bold",
               item.isUnderline && "underline"
@@ -219,7 +218,6 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
           zIndex: isSelected ? 999 : (item.zIndex || 1),
         }}
       >
-        {/* Selection Glow */}
         {isSelected && (
           <div className="absolute -inset-4 bg-primary/5 rounded-lg -z-10 animate-pulse" />
         )}
@@ -255,7 +253,6 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
             </Button>
 
             <div className="absolute inset-0 border border-dashed border-primary/40 rounded-sm pointer-events-none" />
-            
             <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
               <Move className="h-12 w-12 text-primary" />
             </div>

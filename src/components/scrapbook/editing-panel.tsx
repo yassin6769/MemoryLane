@@ -15,9 +15,7 @@ import {
   Plus,
   Minus
 } from "lucide-react";
-import { doc, getFirestore, serverTimestamp } from "firebase/firestore";
-import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { useToast } from "@/hooks/use-toast";
+import { useAutoSave } from "@/hooks/use-auto-save";
 import {
   Select,
   SelectContent,
@@ -34,8 +32,7 @@ interface EditingPanelProps {
 }
 
 export function EditingPanel({ selectedItem, scrapbookId, pageId, onClose }: EditingPanelProps) {
-  const db = getFirestore();
-  const { toast } = useToast();
+  const { debouncedUpdate } = useAutoSave();
   
   // Local state for sliders to allow smooth dragging before Firestore update
   const [rotation, setRotation] = useState(selectedItem.rotation || 0);
@@ -46,53 +43,41 @@ export function EditingPanel({ selectedItem, scrapbookId, pageId, onClose }: Edi
     setScale(Math.abs(selectedItem.scaleX || 1));
   }, [selectedItem.id, selectedItem.rotation, selectedItem.scaleX]);
 
-  const updateFirestore = (updates: any) => {
-    const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", selectedItem.id);
-    updateDocumentNonBlocking(docRef, {
-      ...updates,
-      updatedAt: serverTimestamp()
-    });
-  };
-
   const handleRotationChange = (val: number[]) => {
     setRotation(val[0]);
-  };
-
-  const handleRotationCommit = (val: number[]) => {
-    updateFirestore({ rotation: val[0] });
+    // Trigger auto-save immediately as user slides
+    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { rotation: val[0] });
   };
 
   const handleScaleChange = (val: number[]) => {
-    setScale(val[0]);
-  };
-
-  const handleScaleCommit = (val: number[]) => {
+    const newScale = val[0];
+    setScale(newScale);
     const isFlipped = (selectedItem.scaleX || 1) < 0;
-    updateFirestore({ 
-      scaleX: val[0] * (isFlipped ? -1 : 1),
-      scaleY: val[0]
+    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { 
+      scaleX: newScale * (isFlipped ? -1 : 1),
+      scaleY: newScale
     });
   };
 
   const toggleBold = () => {
-    updateFirestore({ isBold: !selectedItem.isBold });
+    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { isBold: !selectedItem.isBold });
   };
 
   const toggleUnderline = () => {
-    updateFirestore({ isUnderline: !selectedItem.isUnderline });
+    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { isUnderline: !selectedItem.isUnderline });
   };
 
   const adjustFontSize = (delta: number) => {
     const newSize = Math.max(8, (selectedItem.fontSize || 24) + delta);
-    updateFirestore({ fontSize: newSize });
+    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { fontSize: newSize });
   };
 
   const handleFontFamilyChange = (font: string) => {
-    updateFirestore({ fontFamily: font });
+    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { fontFamily: font });
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow-2xl animate-in slide-in-from-bottom duration-300 pb-safe sm:left-14">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t shadow-2xl animate-in slide-in-from-bottom duration-300 pb-safe sm:left-14">
       <div className="container mx-auto p-4 flex flex-col gap-6 max-w-4xl">
         <div className="flex items-center justify-between border-b pb-2">
           <div className="flex items-center gap-2">
@@ -122,7 +107,6 @@ export function EditingPanel({ selectedItem, scrapbookId, pageId, onClose }: Edi
               max={360} 
               step={1}
               onValueChange={handleRotationChange}
-              onValueCommit={handleRotationCommit}
             />
           </div>
 
@@ -141,7 +125,6 @@ export function EditingPanel({ selectedItem, scrapbookId, pageId, onClose }: Edi
               max={3.0} 
               step={0.1}
               onValueChange={handleScaleChange}
-              onValueCommit={handleScaleCommit}
             />
           </div>
         </div>
