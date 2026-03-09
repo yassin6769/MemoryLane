@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Cloud, CloudCheck, CloudOff, Loader2 } from "lucide-react";
+import { Check, CloudOff, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -22,9 +22,13 @@ export function SaveIndicator() {
   const [status, setStatus] = useState<typeof lastStatus>(lastStatus);
 
   useEffect(() => {
-    listeners.push(setStatus);
+    const handleStatusUpdate = (newStatus: typeof lastStatus) => {
+      setStatus(newStatus);
+    };
+
+    listeners.push(handleStatusUpdate);
     return () => {
-      const index = listeners.indexOf(setStatus);
+      const index = listeners.indexOf(handleStatusUpdate);
       if (index > -1) listeners.splice(index, 1);
     };
   }, []);
@@ -46,7 +50,7 @@ export function SaveIndicator() {
       )}
       {status === 'saved' && (
         <>
-          <CloudCheck className="h-3 w-3" />
+          <Check className="h-3 w-3" />
           <span>All changes saved</span>
         </>
       )}
