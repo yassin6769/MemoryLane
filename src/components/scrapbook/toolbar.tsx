@@ -240,6 +240,8 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       text: textInput,
       isBold: false,
       isUnderline: false,
+      fontSize: 24,
+      fontFamily: "font-serif",
       members: scrapbook.members,
       x: 150,
       y: 150,

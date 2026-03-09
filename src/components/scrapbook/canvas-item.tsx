@@ -8,7 +8,7 @@ import { updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase
 import { doc, getFirestore, serverTimestamp } from "firebase/firestore";
 import { ref, deleteObject } from "firebase/storage";
 import { useStorage } from "@/firebase";
-import { Trash2, AlertTriangle, RotateCcw, FlipHorizontal, Maximize2, Move, Bold, Underline } from "lucide-react";
+import { Trash2, AlertTriangle, RotateCcw, FlipHorizontal, Maximize2, Move, Bold, Underline, Type, Plus, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -20,6 +20,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
 interface CanvasItemProps {
@@ -204,6 +211,23 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     toast({ title: !item.isUnderline ? "Underline Applied" : "Underline Removed" });
   };
 
+  const handleFontSizeChange = (delta: number) => {
+    const newSize = Math.max(8, (item.fontSize || 24) + delta);
+    const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", item.id);
+    updateDocumentNonBlocking(docRef, {
+      fontSize: newSize,
+      updatedAt: serverTimestamp()
+    });
+  };
+
+  const handleFontFamilyChange = (font: string) => {
+    const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", item.id);
+    updateDocumentNonBlocking(docRef, {
+      fontFamily: font,
+      updatedAt: serverTimestamp()
+    });
+  };
+
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
@@ -240,12 +264,15 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
         );
       case "text":
         return (
-          <div className="w-full h-full p-4 flex items-center justify-center pointer-events-none bg-white/40 backdrop-blur-[2px] rounded-lg border border-dashed border-primary/20">
+          <div className="w-full h-full p-4 flex items-center justify-center pointer-events-none bg-white/40 backdrop-blur-[2px] rounded-lg border border-dashed border-primary/20 overflow-hidden">
             <p className={cn(
-              "text-2xl font-headline text-center leading-tight text-foreground/80",
+              "text-center leading-tight text-foreground/80",
+              item.fontFamily || "font-serif",
               item.isBold && "font-bold",
               item.isUnderline && "underline"
-            )}>
+            )}
+            style={{ fontSize: `${item.fontSize || 24}px` }}
+            >
               {item.text}
             </p>
           </div>
@@ -309,7 +336,40 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
           <div className="absolute inset-0 pointer-events-none">
             {/* TEXT FORMATTING TOOLBAR */}
             {item.type === 'text' && (
-              <div className="absolute -top-24 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-primary/20 rounded-full p-1 shadow-lg pointer-events-auto z-[110] action-button">
+              <div className="absolute -top-28 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-primary/20 rounded-full p-1.5 shadow-lg pointer-events-auto z-[110] action-button flex-nowrap whitespace-nowrap min-w-max">
+                <Select value={item.fontFamily || "font-serif"} onValueChange={handleFontFamilyChange}>
+                  <SelectTrigger className="h-8 w-[110px] rounded-full border-none focus:ring-0">
+                    <SelectValue placeholder="Font" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="font-serif">Serif</SelectItem>
+                    <SelectItem value="font-sans">Sans</SelectItem>
+                    <SelectItem value="font-mono">Mono</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <div className="h-6 w-px bg-muted mx-1" />
+
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  className="h-8 w-8 rounded-full hover:bg-primary/10"
+                  onClick={(e) => { e.stopPropagation(); handleFontSizeChange(-2); }}
+                >
+                  <Minus className="h-3 w-3" />
+                </Button>
+                <span className="text-xs font-medium w-6 text-center">{item.fontSize || 24}</span>
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  className="h-8 w-8 rounded-full hover:bg-primary/10"
+                  onClick={(e) => { e.stopPropagation(); handleFontSizeChange(2); }}
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+
+                <div className="h-6 w-px bg-muted mx-1" />
+
                 <Button 
                   size="icon" 
                   variant={item.isBold ? "default" : "ghost"} 

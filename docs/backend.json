@@ -68,6 +68,8 @@
         "text": { "type": "string" },
         "isBold": { "type": "boolean" },
         "isUnderline": { "type": "boolean" },
+        "fontSize": { "type": "number", "default": 24 },
+        "fontFamily": { "type": "string", "enum": ["font-serif", "font-sans", "font-mono"], "default": "font-serif" },
         "x": { "type": "number" },
         "y": { "type": "number" },
         "width": { "type": "number" },
