@@ -3,7 +3,7 @@
 
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -37,6 +37,7 @@ import { CollaboratorDialog } from "../scrapbook/collaborator-dialog";
 import { useFirestore } from "@/firebase";
 import { deleteScrapbook } from "@/data/scrapbooks";
 import { useToast } from "@/hooks/use-toast";
+import { PlaceHolderImages } from "@/lib/placeholder-images";
 
 interface ScrapbookCardProps {
   scrapbook: any;
@@ -50,6 +51,21 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  // Determine the best image to show: 
+  // 1. User added cover image (denormalized)
+  // 2. Category-based placeholder
+  // 3. General fallback
+  const displayImage = useMemo(() => {
+    if (scrapbook.coverImage) return scrapbook.coverImage;
+    
+    // Find a placeholder matching the category
+    const categoryPlaceholder = PlaceHolderImages.find(img => 
+      img.id.includes(scrapbook.category?.toLowerCase())
+    );
+    
+    return categoryPlaceholder?.imageUrl || "https://picsum.photos/seed/default-scrapbook/400/300";
+  }, [scrapbook.coverImage, scrapbook.category]);
 
   // Robust check to ensure pointer events are always restored when modals close
   useEffect(() => {
@@ -101,19 +117,13 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
         <div className="flex-grow">
           <CardHeader className="p-0">
             <div className="relative h-48 w-full bg-muted/30 overflow-hidden">
-              {scrapbook.coverImage ? (
-                <Image
-                  src={scrapbook.coverImage}
-                  alt={`Cover image for ${scrapbook.title}`}
-                  fill
-                  className="object-cover transition-transform duration-500 group-hover:scale-110"
-                  data-ai-hint="scrapbook cover"
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/50">
-                  No Cover Image
-                </div>
-              )}
+              <Image
+                src={displayImage}
+                alt={`Cover image for ${scrapbook.title}`}
+                fill
+                className="object-cover transition-transform duration-500 group-hover:scale-110"
+                data-ai-hint="scrapbook cover"
+              />
               <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
           </CardHeader>

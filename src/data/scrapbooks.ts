@@ -31,16 +31,13 @@ export async function createScrapbook(
     ownerId: user.uid,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-    pageIds: [],
-    collaboratorPermissionIds: [],
-    collaboratorIds: [],
-    pageCount: 0, // Initialize page count
+    pageCount: 0,
     members: {
       [user.uid]: 'owner',
     },
     isFinalized: false,
     isPublic: false,
-    coverImage: `https://picsum.photos/seed/${Math.random().toString(36).substring(7)}/400/300`,
+    coverImage: "", // Initialize empty for dynamic selection
   };
 
   try {

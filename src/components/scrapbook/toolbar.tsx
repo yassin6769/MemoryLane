@@ -210,6 +210,17 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
           };
           
           addDocumentNonBlocking(objectsCol, objectData);
+
+          // PERFORMANCE OPTIMIZATION: Denormalize coverImage
+          // If this is the first image added, promote it to the scrapbook's cover
+          if (type === 'image' && (!scrapbook.coverImage || scrapbook.coverImage === "")) {
+            const scrapbookRef = doc(db, "scrapbooks", scrapbook.id);
+            updateDocumentNonBlocking(scrapbookRef, {
+              coverImage: downloadUrl,
+              updatedAt: serverTimestamp()
+            });
+          }
+
           setUploadProgress(null);
           toast({ title: "Success", description: `${type} added to your canvas.` });
         }
