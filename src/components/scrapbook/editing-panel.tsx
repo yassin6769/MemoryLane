@@ -13,7 +13,9 @@ import {
   Bold, 
   Underline,
   Plus,
-  Minus
+  Minus,
+  BringToFront,
+  SendToBack
 } from "lucide-react";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import {
@@ -23,16 +25,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface EditingPanelProps {
   selectedItem: any;
+  allItems: any[];
   scrapbookId: string;
   pageId: string;
   onClose: () => void;
   onLiveUpdate: (id: string, updates: any) => void;
 }
 
-export function EditingPanel({ selectedItem, scrapbookId, pageId, onClose, onLiveUpdate }: EditingPanelProps) {
+export function EditingPanel({ selectedItem, allItems, scrapbookId, pageId, onClose, onLiveUpdate }: EditingPanelProps) {
   const { debouncedUpdate } = useAutoSave();
   
   // Local state for sliders to allow smooth dragging before Firestore update
@@ -65,6 +69,22 @@ export function EditingPanel({ selectedItem, scrapbookId, pageId, onClose, onLiv
     onLiveUpdate(selectedItem.id, updates);
     // 2. Debounced Firestore Sync (Silent Write)
     debouncedUpdate(scrapbookId, pageId, selectedItem.id, updates);
+  };
+
+  const bringToFront = () => {
+    if (!allItems.length) return;
+    const maxZ = Math.max(...allItems.map(i => i.zIndex || 0));
+    const newZ = maxZ + 1;
+    onLiveUpdate(selectedItem.id, { zIndex: newZ });
+    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { zIndex: newZ });
+  };
+
+  const sendToBack = () => {
+    if (!allItems.length) return;
+    const minZ = Math.min(...allItems.map(i => i.zIndex || 0));
+    const newZ = minZ - 1;
+    onLiveUpdate(selectedItem.id, { zIndex: newZ });
+    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { zIndex: newZ });
   };
 
   const toggleBold = () => {
@@ -100,9 +120,34 @@ export function EditingPanel({ selectedItem, scrapbookId, pageId, onClose, onLiv
             </div>
             <h3 className="font-headline font-bold text-lg capitalize">Edit {selectedItem.type}</h3>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full">
-            <X className="h-5 w-5" />
-          </Button>
+          
+          <div className="flex items-center gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={bringToFront} className="h-9 w-9">
+                    <BringToFront className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Bring to Front</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={sendToBack} className="h-9 w-9">
+                    <SendToBack className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Send to Back</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <div className="h-6 border-l mx-2" />
+
+            <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full h-9 w-9">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

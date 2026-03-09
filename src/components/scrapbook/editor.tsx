@@ -225,6 +225,7 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
       {selectedItem && (
         <EditingPanel 
           selectedItem={selectedItem}
+          allItems={localItems}
           scrapbookId={scrapbook.id}
           pageId={activePageId}
           onClose={() => setSelectedItemId(null)}
