@@ -52,20 +52,24 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // Determine the best image to show: 
-  // 1. User added cover image (denormalized)
-  // 2. Category-based placeholder
-  // 3. General fallback
+  /**
+   * DYNAMIC COVER LOGIC:
+   * 1. Priority: Denormalized coverImage (latest/first image added).
+   * 2. Fallback: Category-specific high-quality placeholder.
+   * 3. Final Fallback: Seeded random placeholder.
+   */
   const displayImage = useMemo(() => {
-    if (scrapbook.coverImage) return scrapbook.coverImage;
+    if (scrapbook.coverImage && scrapbook.coverImage !== "") {
+      return scrapbook.coverImage;
+    }
     
     // Find a placeholder matching the category
     const categoryPlaceholder = PlaceHolderImages.find(img => 
       img.id.includes(scrapbook.category?.toLowerCase())
     );
     
-    return categoryPlaceholder?.imageUrl || "https://picsum.photos/seed/default-scrapbook/400/300";
-  }, [scrapbook.coverImage, scrapbook.category]);
+    return categoryPlaceholder?.imageUrl || `https://picsum.photos/seed/${scrapbook.id}/400/300`;
+  }, [scrapbook.coverImage, scrapbook.category, scrapbook.id]);
 
   // Robust check to ensure pointer events are always restored when modals close
   useEffect(() => {
@@ -116,6 +120,7 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
         
         <div className="flex-grow">
           <CardHeader className="p-0">
+            {/* Visual Polish: centerCrop equivalent using object-cover */}
             <div className="relative h-48 w-full bg-muted/30 overflow-hidden">
               <Image
                 src={displayImage}
@@ -123,6 +128,7 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
                 fill
                 className="object-cover transition-transform duration-500 group-hover:scale-110"
                 data-ai-hint="scrapbook cover"
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
