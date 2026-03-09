@@ -50,6 +50,7 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
   
   const hasMoved = useRef(false);
   const itemRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   
   const db = getFirestore();
   const storage = useStorage();
@@ -57,6 +58,7 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
 
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>, mode: InteractionMode = 'drag') => {
     e.stopPropagation();
+    // Don't start interaction if we clicked a button
     if ((e.target as HTMLElement).closest('.action-button')) return;
 
     setInteractionMode(mode);
@@ -94,12 +96,13 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
       if (itemRef.current) {
         itemRef.current.style.left = `${newX}px`;
         itemRef.current.style.top = `${newY}px`;
-        // Maintain rotation and add lift scale
-        itemRef.current.style.transform = `rotate(${item.rotation || 0}deg) scale(1.02)`;
+        // Maintain base rotation during drag
+        itemRef.current.style.transform = `rotate(${item.rotation || 0}deg)`;
       }
     } 
     else if (interactionMode === 'resize') {
       const newWidth = Math.max(50, interactionStart.current.width + dx);
+      // Maintain aspect ratio for media content
       const newHeight = (item.type === 'video' || item.type === 'image')
         ? (newWidth * interactionStart.current.height) / interactionStart.current.width
         : Math.max(30, interactionStart.current.height + dy);
@@ -118,7 +121,6 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
       const finalRotation = interactionStart.current.rotation + rotationDiff;
       
       if (itemRef.current) {
-        // Apply rotation only to parent container
         itemRef.current.style.transform = `rotate(${finalRotation}deg)`;
       }
     }
@@ -129,11 +131,6 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     setInteractionMode(null);
     window.removeEventListener("mousemove", handleMouseMove);
     window.removeEventListener("mouseup", handleMouseUp);
-
-    // Reset visual lift transform to base rotation
-    if (itemRef.current) {
-      itemRef.current.style.transform = `rotate(${item.rotation || 0}deg)`;
-    }
 
     if (!hasMoved.current) {
       setIsSelected(!isSelected);
@@ -203,7 +200,7 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     switch (item.type) {
       case "image":
         return (
-          <div className="relative w-full h-full overflow-hidden rounded-sm bg-muted/20 shadow-sm border border-white/50 pointer-events-none select-none">
+          <div className="relative w-full h-full overflow-hidden rounded-sm bg-muted/20 pointer-events-none select-none">
             <Image
               src={item.mediaUri}
               alt="Memory"
@@ -223,7 +220,7 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
         );
       case "video":
         return (
-          <div className="relative w-full h-full pointer-events-none rounded-sm bg-black shadow-md overflow-hidden">
+          <div className="relative w-full h-full pointer-events-none rounded-sm bg-black overflow-hidden">
             <video 
               src={item.mediaUri} 
               className="w-full h-full object-cover"
@@ -266,8 +263,9 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
           zIndex: interactionMode ? 9999 : (item.zIndex || 1),
         }}
       >
-        {/* Layer A (Content): Receives scale transformations only */}
+        {/* Layer A (Content): Only handles flipping via scaleX/Y */}
         <div 
+          ref={contentRef}
           className="w-full h-full pointer-events-none"
           style={{
             transform: `scaleX(${item.scaleX || 1}) scaleY(${item.scaleY || 1})`,
@@ -277,13 +275,13 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
           {renderContent()}
         </div>
 
-        {/* Layer B (Controls): Static scale, anchored UI */}
+        {/* Layer B (Controls): Static position, un-affected by Layer A's scale */}
         {isSelected && (
-          <>
-            {/* ROTATION HANDLE (TOP) */}
+          <div className="absolute inset-0 pointer-events-none">
+            {/* ROTATION HANDLE (TOP CENTER) */}
             <div 
               onMouseDown={(e) => handleMouseDown(e, 'rotate')}
-              className="absolute -top-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 cursor-alias group z-[100]"
+              className="absolute -top-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 cursor-alias group pointer-events-auto z-[100]"
             >
               <div className="w-0.5 h-6 bg-primary" />
               <Button size="icon" variant="outline" className="h-8 w-8 rounded-full border-primary bg-white shadow-md action-button hover:bg-primary hover:text-white transition-colors">
@@ -295,30 +293,30 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
             <Button 
               variant="destructive" 
               size="icon" 
-              className="absolute -top-4 -right-4 h-8 w-8 rounded-full shadow-lg action-button z-[102]"
+              className="absolute -top-4 -right-4 h-8 w-8 rounded-full shadow-lg action-button pointer-events-auto z-[102]"
               onClick={(e) => { e.stopPropagation(); setIsDeleteDialogOpen(true); }}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
 
-            {/* FLIP BUTTON (BOTTOM-RIGHT) */}
+            {/* FLIP BUTTON (BOTTOM-LEFT) */}
             <Button 
               variant="secondary" 
               size="icon" 
-              className="absolute -bottom-4 -right-4 h-8 w-8 rounded-full shadow-lg action-button z-[102]"
+              className="absolute -bottom-4 -left-4 h-8 w-8 rounded-full shadow-lg action-button pointer-events-auto z-[102]"
               onClick={handleFlip}
             >
               <FlipHorizontal className="h-4 w-4" />
             </Button>
 
-            {/* RESIZE HANDLE (INSIDE BOTTOM RIGHT) */}
+            {/* RESIZE HANDLE (BOTTOM-RIGHT) */}
             <div 
               onMouseDown={(e) => handleMouseDown(e, 'resize')}
-              className="absolute bottom-2 right-2 h-7 w-7 bg-white/80 backdrop-blur-sm border-2 border-primary rounded-sm cursor-nwse-resize shadow-sm z-[100] flex items-center justify-center active:bg-primary group transition-colors"
+              className="absolute -bottom-4 -right-4 h-8 w-8 bg-white border-2 border-primary rounded-full cursor-nwse-resize shadow-lg pointer-events-auto z-[100] flex items-center justify-center active:bg-primary group transition-colors"
             >
               <Maximize2 className="h-4 w-4 text-primary group-active:text-white" />
             </div>
-          </>
+          </div>
         )}
       </div>
 
