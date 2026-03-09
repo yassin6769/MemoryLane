@@ -8,7 +8,7 @@ import { updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase
 import { doc, getFirestore, serverTimestamp } from "firebase/firestore";
 import { ref, deleteObject } from "firebase/storage";
 import { useStorage } from "@/firebase";
-import { Trash2, AlertTriangle, RotateCcw, FlipHorizontal, Maximize2 } from "lucide-react";
+import { Trash2, AlertTriangle, RotateCcw, FlipHorizontal, Maximize2, Move } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -45,7 +45,8 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     width: 0, 
     height: 0, 
     rotation: 0,
-    angle: 0
+    angle: 0,
+    dist: 0
   });
   
   const hasMoved = useRef(false);
@@ -58,8 +59,8 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
 
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>, mode: InteractionMode = 'drag') => {
     e.stopPropagation();
-    // Don't start interaction if we clicked a button
-    if ((e.target as HTMLElement).closest('.action-button')) return;
+    // Don't start interaction if we clicked a button (except for the Drag handle)
+    if ((e.target as HTMLElement).closest('.action-button') && mode === 'drag') return;
 
     setInteractionMode(mode);
     hasMoved.current = false;
@@ -67,6 +68,9 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
     const rect = itemRef.current?.getBoundingClientRect();
     const centerX = rect ? rect.left + rect.width / 2 : 0;
     const centerY = rect ? rect.top + rect.height / 2 : 0;
+
+    const dx = e.clientX - centerX;
+    const dy = e.clientY - centerY;
 
     interactionStart.current = {
       clientX: e.clientX,
@@ -76,7 +80,8 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
       width: item.width,
       height: item.height,
       rotation: item.rotation || 0,
-      angle: Math.atan2(e.clientY - centerY, e.clientX - centerX)
+      angle: Math.atan2(dy, dx),
+      dist: Math.sqrt(dx * dx + dy * dy)
     };
     
     window.addEventListener("mousemove", handleMouseMove);
@@ -84,45 +89,52 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
   };
 
   const handleMouseMove = (e: globalThis.MouseEvent) => {
-    if (!interactionMode) return;
+    if (!interactionMode || !itemRef.current) return;
     hasMoved.current = true;
 
-    const dx = e.clientX - interactionStart.current.clientX;
-    const dy = e.clientY - interactionStart.current.clientY;
+    const rect = itemRef.current.getBoundingClientRect();
+    const parentRect = itemRef.current.parentElement?.getBoundingClientRect();
+    if (!parentRect) return;
+
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
 
     if (interactionMode === 'drag') {
-      const newX = interactionStart.current.x + dx;
-      const newY = interactionStart.current.y + dy;
-      if (itemRef.current) {
-        itemRef.current.style.left = `${newX}px`;
-        itemRef.current.style.top = `${newY}px`;
-        // Maintain base rotation during drag
-        itemRef.current.style.transform = `rotate(${item.rotation || 0}deg)`;
-      }
+      const dx = e.clientX - interactionStart.current.clientX;
+      const dy = e.clientY - interactionStart.current.clientY;
+      
+      let newX = interactionStart.current.x + dx;
+      let newY = interactionStart.current.y + dy;
+
+      // Boundary Constraints: Keep item within the canvas scope
+      newX = Math.max(0, Math.min(newX, parentRect.width - item.width));
+      newY = Math.max(0, Math.min(newY, parentRect.height - item.height));
+
+      itemRef.current.style.left = `${newX}px`;
+      itemRef.current.style.top = `${newY}px`;
     } 
     else if (interactionMode === 'resize') {
-      const newWidth = Math.max(50, interactionStart.current.width + dx);
-      // Maintain aspect ratio for media content
+      const dx = e.clientX - centerX;
+      const dy = e.clientY - centerY;
+      const currentDist = Math.sqrt(dx * dx + dy * dy);
+      const ratio = currentDist / interactionStart.current.dist;
+
+      const newWidth = Math.max(50, interactionStart.current.width * ratio);
       const newHeight = (item.type === 'video' || item.type === 'image')
         ? (newWidth * interactionStart.current.height) / interactionStart.current.width
-        : Math.max(30, interactionStart.current.height + dy);
+        : Math.max(30, interactionStart.current.height * ratio);
 
-      if (itemRef.current) {
-        itemRef.current.style.width = `${newWidth}px`;
-        itemRef.current.style.height = `${newHeight}px`;
-      }
+      itemRef.current.style.width = `${newWidth}px`;
+      itemRef.current.style.height = `${newHeight}px`;
     }
     else if (interactionMode === 'rotate') {
-      const rect = itemRef.current?.getBoundingClientRect();
-      const centerX = rect ? rect.left + rect.width / 2 : 0;
-      const centerY = rect ? rect.top + rect.height / 2 : 0;
-      const currentAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+      const dx = e.clientX - centerX;
+      const dy = e.clientY - centerY;
+      const currentAngle = Math.atan2(dy, dx);
       const rotationDiff = (currentAngle - interactionStart.current.angle) * (180 / Math.PI);
       const finalRotation = interactionStart.current.rotation + rotationDiff;
       
-      if (itemRef.current) {
-        itemRef.current.style.transform = `rotate(${finalRotation}deg)`;
-      }
+      itemRef.current.style.transform = `rotate(${finalRotation}deg)`;
     }
   };
 
@@ -137,30 +149,28 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
       return;
     }
 
+    if (!itemRef.current) return;
+
     const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", item.id);
     const updates: any = { updatedAt: serverTimestamp() };
 
-    const dx = e.clientX - interactionStart.current.clientX;
-    const dy = e.clientY - interactionStart.current.clientY;
-
+    // Get final values from the DOM for absolute accuracy
     if (finalMode === 'drag') {
-      updates.x = interactionStart.current.x + dx;
-      updates.y = interactionStart.current.y + dy;
+      updates.x = parseFloat(itemRef.current.style.left);
+      updates.y = parseFloat(itemRef.current.style.top);
       onUpdatePosition(item.id, updates.x, updates.y);
     } 
     else if (finalMode === 'resize') {
-      updates.width = Math.max(50, interactionStart.current.width + dx);
-      updates.height = (item.type === 'video' || item.type === 'image')
-        ? (updates.width * interactionStart.current.height) / interactionStart.current.width
-        : Math.max(30, interactionStart.current.height + dy);
+      updates.width = parseFloat(itemRef.current.style.width);
+      updates.height = parseFloat(itemRef.current.style.height);
     }
     else if (finalMode === 'rotate') {
-      const rect = itemRef.current?.getBoundingClientRect();
-      const centerX = rect ? rect.left + rect.width / 2 : 0;
-      const centerY = rect ? rect.top + rect.height / 2 : 0;
-      const currentAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
-      const rotationDiff = (currentAngle - interactionStart.current.angle) * (180 / Math.PI);
-      updates.rotation = interactionStart.current.rotation + rotationDiff;
+      // Extract rotation from the transform string "rotate(Xdeg)"
+      const transform = itemRef.current.style.transform;
+      const match = transform.match(/rotate\((.*)deg\)/);
+      if (match) {
+        updates.rotation = parseFloat(match[1]);
+      }
     }
 
     updateDocumentNonBlocking(docRef, updates);
@@ -315,6 +325,13 @@ export function CanvasItem({ item, onUpdatePosition, scrapbookId, pageId }: Canv
               className="absolute -bottom-4 -right-4 h-8 w-8 bg-white border-2 border-primary rounded-full cursor-nwse-resize shadow-lg pointer-events-auto z-[100] flex items-center justify-center active:bg-primary group transition-colors"
             >
               <Maximize2 className="h-4 w-4 text-primary group-active:text-white" />
+            </div>
+
+            {/* DRAG HANDLE (CENTER OVERLAY - OPTIONAL BUT HELPFUL) */}
+            <div 
+              className="absolute inset-4 border border-dashed border-primary/20 flex items-center justify-center rounded-md bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <Move className="h-6 w-6 text-primary/40" />
             </div>
           </div>
         )}
