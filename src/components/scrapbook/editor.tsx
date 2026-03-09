@@ -7,7 +7,7 @@ import { Toolbar } from "@/components/scrapbook/toolbar";
 import { PagePagination } from "@/components/scrapbook/page-pagination";
 import { EditingPanel } from "@/components/scrapbook/editing-panel";
 import { SaveIndicator } from "@/components/scrapbook/save-indicator";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { collection, doc, query, orderBy, setDoc, serverTimestamp, addDoc, updateDoc, increment } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -81,10 +81,15 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
     }
   }, [serverItems, activePageId]);
 
-  const updateItemPositionLocal = (id: string, x: number, y: number) => {
+  // Live update function to provide instant UI feedback (optimistic)
+  const handleLiveUpdate = useCallback((id: string, updates: any) => {
     setLocalItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, x, y } : item))
+      prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
     );
+  }, []);
+
+  const updateItemPositionLocal = (id: string, x: number, y: number) => {
+    handleLiveUpdate(id, { x, y });
   };
 
   const handleNextPage = () => {
@@ -223,6 +228,7 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
           scrapbookId={scrapbook.id}
           pageId={activePageId}
           onClose={() => setSelectedItemId(null)}
+          onLiveUpdate={handleLiveUpdate}
         />
       )}
     </div>

@@ -53,7 +53,7 @@ export function useAutoSave() {
           description: "Could not save your changes. Please check your connection.",
         });
       });
-    }, 800); // 800ms debounce
+    }, 300); // 300ms debounce as requested for "Silent" but responsive writes
   }, [db, toast]);
 
   return { debouncedUpdate };

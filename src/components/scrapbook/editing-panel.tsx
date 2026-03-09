@@ -29,14 +29,15 @@ interface EditingPanelProps {
   scrapbookId: string;
   pageId: string;
   onClose: () => void;
+  onLiveUpdate: (id: string, updates: any) => void;
 }
 
-export function EditingPanel({ selectedItem, scrapbookId, pageId, onClose }: EditingPanelProps) {
+export function EditingPanel({ selectedItem, scrapbookId, pageId, onClose, onLiveUpdate }: EditingPanelProps) {
   const { debouncedUpdate } = useAutoSave();
   
   // Local state for sliders to allow smooth dragging before Firestore update
   const [rotation, setRotation] = useState(selectedItem.rotation || 0);
-  const [scale, setScale] = useState(selectedItem.scaleX || 1);
+  const [scale, setScale] = useState(Math.abs(selectedItem.scaleX || 1));
 
   useEffect(() => {
     setRotation(selectedItem.rotation || 0);
@@ -44,35 +45,48 @@ export function EditingPanel({ selectedItem, scrapbookId, pageId, onClose }: Edi
   }, [selectedItem.id, selectedItem.rotation, selectedItem.scaleX]);
 
   const handleRotationChange = (val: number[]) => {
-    setRotation(val[0]);
-    // Trigger auto-save immediately as user slides
-    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { rotation: val[0] });
+    const newRotation = val[0];
+    setRotation(newRotation);
+    // 1. Instant UI Feedback (Live Preview)
+    onLiveUpdate(selectedItem.id, { rotation: newRotation });
+    // 2. Debounced Firestore Sync (Silent Write)
+    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { rotation: newRotation });
   };
 
   const handleScaleChange = (val: number[]) => {
     const newScale = val[0];
     setScale(newScale);
     const isFlipped = (selectedItem.scaleX || 1) < 0;
-    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { 
+    const updates = { 
       scaleX: newScale * (isFlipped ? -1 : 1),
       scaleY: newScale
-    });
+    };
+    // 1. Instant UI Feedback (Live Preview)
+    onLiveUpdate(selectedItem.id, updates);
+    // 2. Debounced Firestore Sync (Silent Write)
+    debouncedUpdate(scrapbookId, pageId, selectedItem.id, updates);
   };
 
   const toggleBold = () => {
-    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { isBold: !selectedItem.isBold });
+    const newBold = !selectedItem.isBold;
+    onLiveUpdate(selectedItem.id, { isBold: newBold });
+    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { isBold: newBold });
   };
 
   const toggleUnderline = () => {
-    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { isUnderline: !selectedItem.isUnderline });
+    const newUnderline = !selectedItem.isUnderline;
+    onLiveUpdate(selectedItem.id, { isUnderline: newUnderline });
+    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { isUnderline: newUnderline });
   };
 
   const adjustFontSize = (delta: number) => {
     const newSize = Math.max(8, (selectedItem.fontSize || 24) + delta);
+    onLiveUpdate(selectedItem.id, { fontSize: newSize });
     debouncedUpdate(scrapbookId, pageId, selectedItem.id, { fontSize: newSize });
   };
 
   const handleFontFamilyChange = (font: string) => {
+    onLiveUpdate(selectedItem.id, { fontFamily: font });
     debouncedUpdate(scrapbookId, pageId, selectedItem.id, { fontFamily: font });
   };
 
