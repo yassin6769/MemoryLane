@@ -6,14 +6,10 @@ service cloud.firestore {
     /**
      * MemoryLane Security Rules
      * 
-     * Core Philosophy:
-     * This ruleset implements a robust, collaborative security model designed for rapid prototyping.
-     * It prioritizes "Authorization Independence" by relying on denormalized membership data 
-     * within documents to avoid costly cross-document lookups (get() calls).
-     * 
-     * Updates: 
-     * - Added support for 'isPublic' visibility on scrapbooks.
-     * - Improved 'get' rules to handle non-existent documents gracefully.
+     * Implements a robust, hierarchical security model.
+     * 1. Users own their profiles.
+     * 2. Scrapbooks use a 'members' map for collaboration.
+     * 3. Subcollections (pages/objects) inherit permissions from the parent Scrapbook.
      */
 
     // --- Helper Functions ---
@@ -26,75 +22,66 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Checks if the current user is a member of the document (owner, editor, or viewer)
-    function isMember(data) {
+    // Checks if the user has a specific role in the scrapbook
+    function hasRole(scrapbookData, roleList) {
       return isSignedIn() && 
-             data != null && 
-             "members" in data && 
-             data.members[request.auth.uid] != null;
+             scrapbookData != null && 
+             "members" in scrapbookData && 
+             scrapbookData.members[request.auth.uid] in roleList;
     }
 
-    // Checks if the current user has write/edit permissions
-    function canEdit(data) {
-      return isSignedIn() && (
-        data.members[request.auth.uid] == 'owner' || 
-        data.members[request.auth.uid] == 'editor' ||
-        data.ownerId == request.auth.uid
-      );
-    }
-
-    // Checks if the current user is the primary owner
-    function isDocOwner(data) {
-      return isSignedIn() && (
-        data.members[request.auth.uid] == 'owner' ||
-        data.ownerId == request.auth.uid
-      );
-    }
-
-    // Checks if a scrapbook or its parent is public
-    function isPublic(data) {
-      return data != null && data.isPublic == true;
+    // Fetches the parent scrapbook to check permissions for subcollections
+    function getScrapbook(scrapbookId) {
+      return get(/databases/$(database)/documents/scrapbooks/$(scrapbookId)).data;
     }
 
     // --- Collection Rules ---
 
     match /users/{userId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isOwner(userId) && request.resource.data.id == userId;
+      // Users can only manage their own profile
+      allow get, list, create, update: if isOwner(userId);
       allow delete: if false;
     }
 
     match /scrapbooks/{scrapbookId} {
+      // Any signed-in user can list scrapbooks they might be part of
       allow list: if isSignedIn();
-      // Allow get if the document doesn't exist (returns null), if it's public, or if the user is a member/owner
-      allow get: if isSignedIn() && (resource == null || isPublic(resource.data) || isMember(resource.data) || isDocOwner(resource.data));
-      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid && request.resource.data.members[request.auth.uid] == 'owner';
-      allow update: if canEdit(resource.data);
-      allow delete: if isDocOwner(resource.data);
+      
+      // Allow get if public or user is a member
+      allow get: if isSignedIn() && (
+        resource == null || 
+        resource.data.isPublic == true || 
+        hasRole(resource.data, ['owner', 'editor', 'viewer'])
+      );
+
+      // Create: Must set themselves as owner in the members map
+      allow create: if isSignedIn() && 
+                    request.resource.data.ownerId == request.auth.uid && 
+                    request.resource.data.members[request.auth.uid] == 'owner';
+
+      // Update: Only owners and editors
+      allow update: if hasRole(resource.data, ['owner', 'editor']);
+
+      // Delete: Only the owner
+      allow delete: if hasRole(resource.data, ['owner']);
+
+      // --- Subcollections ---
 
       match /pages/{pageId} {
-        allow list: if isSignedIn();
-        // Pages inherit visibility from their parent scrapbook via the 'get' helper or denormalized members
-        allow get: if isSignedIn() && (resource == null || isMember(resource.data) || isDocOwner(resource.data) || get(/databases/$(database)/documents/scrapbooks/$(scrapbookId)).data.isPublic == true);
-        allow create: if isSignedIn() && isMember(request.resource.data);
-        allow update: if canEdit(resource.data);
-        allow delete: if isDocOwner(resource.data);
+        allow list, get: if isSignedIn() && (
+          hasRole(getScrapbook(scrapbookId), ['owner', 'editor', 'viewer']) ||
+          getScrapbook(scrapbookId).isPublic == true
+        );
+        allow create, update, delete: if hasRole(getScrapbook(scrapbookId), ['owner', 'editor']);
 
-        match /canvasObjects/{canvasObjectId} {
-          allow list: if isSignedIn();
-          allow get: if isSignedIn() && (resource == null || isMember(resource.data) || isDocOwner(resource.data) || get(/databases/$(database)/documents/scrapbooks/$(scrapbookId)).data.isPublic == true);
-          allow create: if isSignedIn() && isMember(request.resource.data);
-          allow update: if canEdit(resource.data);
-          allow delete: if isDocOwner(resource.data);
+        match /canvasObjects/{objectId} {
+          allow list, get: if isSignedIn() && (
+            hasRole(getScrapbook(scrapbookId), ['owner', 'editor', 'viewer']) ||
+            getScrapbook(scrapbookId).isPublic == true
+          );
+          allow create, update, delete: if hasRole(getScrapbook(scrapbookId), ['owner', 'editor']);
         }
       }
-    }
-
-    match /users/{userId}/scrapbookInvitations/{invitationId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isSignedIn() && request.resource.data.userId == userId;
-      allow update, delete: if isOwner(userId);
     }
   }
 }

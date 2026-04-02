@@ -8,11 +8,16 @@ import {
   addDoc,
   doc,
   deleteDoc,
+  setDoc,
 } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
+/**
+ * Creates a new scrapbook and ensures the owner is correctly set in the members map
+ * to satisfy Firestore Security Rules.
+ */
 export async function createScrapbook(
   firestore: Firestore,
   user: User,
@@ -33,15 +38,17 @@ export async function createScrapbook(
     updatedAt: serverTimestamp(),
     pageCount: 0,
     members: {
-      [user.uid]: 'owner',
+      [user.uid]: 'owner', // Required by Security Rules
     },
     isFinalized: false,
     isPublic: false,
-    coverImage: "", // Initialize empty for dynamic selection
+    coverImage: "",
   };
 
   try {
     const docRef = await addDoc(scrapbooksCol, newScrapbookData);
+    // Explicitly set the ID field inside the document for convenience
+    await setDoc(docRef, { id: docRef.id }, { merge: true });
     return docRef.id;
   } catch (error) {
     const permissionError = new FirestorePermissionError({
@@ -56,8 +63,7 @@ export async function createScrapbook(
 }
 
 /**
- * Deletes a scrapbook and attempts to clean up its main document.
- * In a client-side prototype, we primarily delete the top-level document.
+ * Deletes a scrapbook. Only allowed if the user is the owner.
  */
 export async function deleteScrapbook(firestore: Firestore, scrapbookId: string): Promise<void> {
   const docRef = doc(firestore, 'scrapbooks', scrapbookId);
