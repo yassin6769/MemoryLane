@@ -10,6 +10,9 @@
         "id": { "type": "string", "description": "Firebase Authentication UID." },
         "email": { "type": "string", "format": "email" },
         "displayName": { "type": "string" },
+        "username": { "type": "string", "description": "Unique display ID/username." },
+        "age": { "type": "number" },
+        "gender": { "type": "string", "enum": ["Male", "Female", "Other"] },
         "profileImageUrl": { "type": "string", "format": "uri" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
