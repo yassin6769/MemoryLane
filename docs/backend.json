@@ -7,11 +7,12 @@
       "type": "object",
       "description": "Represents a user's profile and personal settings within the MemoryLane application.",
       "properties": {
-        "id": { "type": "string", "description": "Firebase Authentication UID." },
+        "id": { "type": "string", "description": "Firebase Authentication UID. Immutable system-generated ID." },
         "email": { "type": "string", "format": "email" },
         "displayName": { "type": "string" },
-        "username": { "type": "string", "description": "Unique display ID/username." },
-        "age": { "type": "number" },
+        "username": { "type": "string", "description": "Unique user-defined handle/social identifier." },
+        "dateOfBirth": { "type": "string", "format": "date-time", "description": "Stored as a Timestamp to calculate age dynamically." },
+        "age": { "type": "number", "description": "Derived from dateOfBirth." },
         "gender": { "type": "string", "enum": ["Male", "Female", "Other"] },
         "profileImageUrl": { "type": "string", "format": "uri" },
         "createdAt": { "type": "string", "format": "date-time" },
@@ -27,7 +28,7 @@
       "properties": {
         "id": { "type": "string" },
         "title": { "type": "string" },
-        "ownerId": { "type": "string", "description": "UID of the owner." },
+        "ownerId": { "type": "string", "description": "UID of the owner. Stable identifier for ownership." },
         "category": { "type": "string", "enum": ["Holiday", "Birthday", "Family", "Wedding", "Other"] },
         "pageCount": { "type": "number", "description": "Total number of pages in the scrapbook." },
         "members": { 
