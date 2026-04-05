@@ -169,12 +169,24 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       toast({ variant: "destructive", title: "Upload Failed", description: "No active page selected." });
       return;
     }
+
+    // Client-side size validation (5MB limit)
+    const MAX_SIZE = 5 * 1024 * 1024;
+    if (blob.size > MAX_SIZE) {
+      toast({
+        variant: "destructive",
+        title: "File Too Large",
+        description: "Please select a file smaller than 5MB.",
+      });
+      return;
+    }
     
     setUploadProgress(0);
     setCurrentMediaType(type);
 
     try {
-      const storagePath = `scrapbooks/${scrapbook.id}/pages/${pageId}/${Date.now()}_${fileName}`;
+      // Path structure: /scrapbooks/{scrapbookId}/{userId}/{fileName}
+      const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
       const storageRef = ref(storage, storagePath);
       const uploadTask = uploadBytesResumable(storageRef, blob);
 
@@ -185,7 +197,37 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         }, 
         (error: StorageError) => {
           setUploadProgress(null);
-          toast({ variant: "destructive", title: "Upload Failed", description: error.message });
+          
+          let errorMessage = "An unexpected error occurred.";
+          
+          // Enhanced error handling switch
+          switch (error.code) {
+            case 'storage/unauthorized':
+              errorMessage = "Permission denied. Please check security rules.";
+              break;
+            case 'storage/canceled':
+              errorMessage = "Upload was canceled.";
+              break;
+            case 'storage/quota-exceeded':
+              errorMessage = "Storage quota exceeded. Please try again later.";
+              break;
+            case 'storage/invalid-checksum':
+              errorMessage = "File integrity check failed. Please retry.";
+              break;
+            case 'storage/retry-limit-exceeded':
+              errorMessage = "Max retry limit reached. Check your connection.";
+              break;
+            default:
+              errorMessage = error.message || "Storage error.";
+              break;
+          }
+
+          toast({ 
+            variant: "destructive", 
+            title: "Upload Failed", 
+            description: errorMessage 
+          });
+          console.error(`[Firebase Storage Error] ${error.code}:`, error);
         }, 
         async () => {
           const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
