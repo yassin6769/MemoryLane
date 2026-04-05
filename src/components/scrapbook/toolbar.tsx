@@ -198,9 +198,16 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         (error: StorageError) => {
           setUploadProgress(null);
           
+          // ADVANCED LOGGING: Capture raw server response to debug "Unknown" errors
+          const customData = (error as any).customData;
+          if (customData && customData.serverResponse) {
+             console.error("[Firebase Storage Debug] Raw Server Response:", customData.serverResponse);
+          } else {
+             console.error("[Firebase Storage Error]", error);
+          }
+          
           let errorMessage = "An unexpected error occurred.";
           
-          // Enhanced error handling switch
           switch (error.code) {
             case 'storage/unauthorized':
               errorMessage = "Permission denied. Please check security rules.";
@@ -218,7 +225,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
               errorMessage = "Max retry limit reached. Check your connection.";
               break;
             default:
-              errorMessage = error.message || "Storage error.";
+              errorMessage = `[${error.code}] ${error.message}`;
               break;
           }
 
@@ -227,7 +234,6 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
             title: "Upload Failed", 
             description: errorMessage 
           });
-          console.error(`[Firebase Storage Error] ${error.code}:`, error);
         }, 
         async () => {
           const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);

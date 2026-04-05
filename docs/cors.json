@@ -1,9 +1,14 @@
 
 [
   {
-    "origin": ["http://localhost:9002", "https://*.webstation.google.com"],
-    "method": ["GET", "PUT", "POST", "DELETE", "HEAD"],
-    "responseHeader": ["Content-Type", "x-goog-resumable"],
+    "origin": [
+      "http://localhost:9002",
+      "https://*.webstation.google.com",
+      "https://studio-4424744590-af358.web.app",
+      "https://studio-4424744590-af358.firebaseapp.com"
+    ],
+    "method": ["GET", "PUT", "POST", "DELETE", "HEAD", "OPTIONS"],
+    "responseHeader": ["Content-Type", "x-goog-resumable", "Authorization"],
     "maxAgeSeconds": 3600
   }
 ]
