@@ -16,7 +16,9 @@ import {
   Minus,
   BringToFront,
   SendToBack,
-  Square
+  Square,
+  Image as ImageIcon,
+  Check
 } from "lucide-react";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import {
@@ -28,18 +30,32 @@ import {
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { doc, getFirestore, serverTimestamp } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
 
 interface EditingPanelProps {
   selectedItem: any;
   allItems: any[];
   scrapbookId: string;
   pageId: string;
+  currentCoverImage?: string;
   onClose: () => void;
   onLiveUpdate: (id: string, updates: any) => void;
 }
 
-export function EditingPanel({ selectedItem, allItems, scrapbookId, pageId, onClose, onLiveUpdate }: EditingPanelProps) {
+export function EditingPanel({ 
+  selectedItem, 
+  allItems, 
+  scrapbookId, 
+  pageId, 
+  currentCoverImage,
+  onClose, 
+  onLiveUpdate 
+}: EditingPanelProps) {
   const { debouncedUpdate } = useAutoSave();
+  const { toast } = useToast();
+  const db = getFirestore();
   
   // Local state for sliders to allow smooth dragging before Firestore update
   const [rotation, setRotation] = useState(selectedItem.rotation || 0);
@@ -99,6 +115,19 @@ export function EditingPanel({ selectedItem, allItems, scrapbookId, pageId, onCl
     debouncedUpdate(scrapbookId, pageId, selectedItem.id, { zIndex: newZ });
   };
 
+  const handleSetAsCover = () => {
+    if (!selectedItem.mediaUri) return;
+    const scrapbookRef = doc(db, "scrapbooks", scrapbookId);
+    updateDocumentNonBlocking(scrapbookRef, { 
+      coverImage: selectedItem.mediaUri,
+      updatedAt: serverTimestamp()
+    });
+    toast({
+      title: "Cover Updated!",
+      description: "This item is now the cover of your scrapbook.",
+    });
+  };
+
   const toggleBold = () => {
     const newBold = !selectedItem.isBold;
     onLiveUpdate(selectedItem.id, { isBold: newBold });
@@ -131,6 +160,8 @@ export function EditingPanel({ selectedItem, allItems, scrapbookId, pageId, onCl
     { name: "Green", value: "#22c55e" },
   ];
 
+  const isCurrentCover = selectedItem.mediaUri && selectedItem.mediaUri === currentCoverImage;
+
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t shadow-2xl animate-in slide-in-from-bottom duration-300 pb-safe sm:left-14">
       <div className="container mx-auto p-4 flex flex-col gap-6 max-w-4xl">
@@ -143,6 +174,27 @@ export function EditingPanel({ selectedItem, allItems, scrapbookId, pageId, onCl
           </div>
           
           <div className="flex items-center gap-2">
+            {(selectedItem.type === 'image' || selectedItem.type === 'video') && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant={isCurrentCover ? "default" : "outline"} 
+                      size="sm" 
+                      onClick={handleSetAsCover}
+                      className={cn("h-9 gap-2", isCurrentCover && "bg-primary text-primary-foreground")}
+                    >
+                      {isCurrentCover ? <Check className="h-4 w-4" /> : <ImageIcon className="h-4 w-4" />}
+                      {isCurrentCover ? "Active Cover" : "Set as Cover"}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Use as Scrapbook Cover</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+
+            <div className="h-6 border-l mx-2" />
+
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>

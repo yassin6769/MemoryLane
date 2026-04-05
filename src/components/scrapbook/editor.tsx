@@ -228,6 +228,7 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
           allItems={localItems}
           scrapbookId={scrapbook.id}
           pageId={activePageId}
+          currentCoverImage={scrapbook.coverImage}
           onClose={() => setSelectedItemId(null)}
           onLiveUpdate={handleLiveUpdate}
         />
