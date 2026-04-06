@@ -158,7 +158,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         return;
     }
 
-    // CRITICAL: Force Token Refresh to prevent Unauthorized errors caused by stale sessions
+    // CRITICAL: Force Token Refresh to ensure session is valid and authorized
     try {
       await user.getIdToken(true);
     } catch (e) {
@@ -167,16 +167,16 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
     const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
     
-    // Debugging path consistency for troubleshooting
-    console.log("[Storage Debug] Target Path:", storagePath);
+    // DEBUG LOGGING: Verify path and user consistency
     console.log("[Storage Debug] Current User UID:", user.uid);
+    console.log("[Storage Debug] Target Path:", storagePath);
 
-    const MAX_SIZE = 5 * 1024 * 1024; // 5MB limit
+    const MAX_SIZE = 10 * 1024 * 1024; // Increased to 10MB for video/audio
     if (blob.size > MAX_SIZE) {
       toast({
         variant: "destructive",
         title: "File Too Large",
-        description: "Please select a file smaller than 5MB.",
+        description: "Please select a file smaller than 10MB.",
       });
       return;
     }
@@ -199,14 +199,14 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         }, 
         (error: StorageError) => {
           setUploadProgress(null);
-          // ADVANCED LOGGING: Capture the raw server payload for precise error fixing
+          // ADVANCED LOGGING: Print full server response to catch CORS or config errors
           const serverResponse = (error as any).customData?.serverResponse;
           console.error("[Storage Error] Code:", error.code);
-          console.error("[Storage Error] Detailed Payload:", serverResponse);
+          console.error("[Storage Error] Server Payload:", serverResponse);
           
           let errorMessage = "An unexpected error occurred.";
           if (error.code === 'storage/unauthorized') {
-            errorMessage = "Permission Denied. Security rules or CORS may be blocking this path.";
+            errorMessage = "Unauthorized. Please ensure Storage Rules allow this path.";
           }
 
           toast({ 
@@ -227,7 +227,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
             members: scrapbook.members,
             x: 100,
             y: 100,
-            width: type === 'audio' ? 300 : 120,
+            width: type === 'audio' ? 300 : (type === 'text' ? 280 : 120),
             height: type === 'audio' ? 120 : (type === 'text' ? 120 : 250),
             rotation: 0,
             scaleX: 1,
@@ -256,6 +256,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       );
     } catch (err: any) {
       setUploadProgress(null);
+      console.error("[Storage Catch] Initialization error:", err);
       toast({ variant: "destructive", title: "Process Failed", description: err.message });
     }
   };
