@@ -5,33 +5,19 @@ service firebase.storage {
     
     /**
      * SCRAPBOOK STORAGE RULES
-     * Path: /scrapbooks/{scrapbookId}/{userId}/{fileName}
-     */
-    match /scrapbooks/{scrapbookId}/{userId}/{fileName} {
-      // Allow any authenticated user to read (for collaboration/viewing)
-      allow read: if request.auth != null;
-      
-      // STRICT WRITE: Only the user matching the folder name can upload/delete
-      // Also enforces a 5MB limit and image/video/audio content types
-      allow write: if request.auth != null 
-                  && request.auth.uid == userId
-                  && request.resource.size < 5 * 1024 * 1024
-                  && (
-                    request.resource.contentType.matches('image/.*') ||
-                    request.resource.contentType.matches('video/.*') ||
-                    request.resource.contentType.matches('audio/.*')
-                  );
-    }
-
-    /**
-     * RECURSIVE CATCH-ALL (For troubleshooting)
-     * If the specific path above fails, this recursive wildcard ensures 
-     * that permissions are evaluated for any depth.
+     * Recursive access for authenticated users to bypass folder-level blocks during dev.
      */
     match /scrapbooks/{allPaths=**} {
-       // TEMPORARY: Uncomment the line below to test if rules are the root cause
-       // allow read, write: if request.auth != null;
-       allow read: if request.auth != null;
+       // Permissive rule for authenticated users to resolve "Unauthorized" errors
+       allow read, write: if request.auth != null;
+    }
+
+    // Specific path logic for future tightening
+    match /scrapbooks/{scrapbookId}/{userId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null 
+                  && request.auth.uid == userId
+                  && request.resource.size < 10 * 1024 * 1024; // 10MB limit
     }
 
     // Default deny

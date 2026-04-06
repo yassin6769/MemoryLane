@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   ImagePlus,
@@ -160,27 +160,23 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         return;
     }
 
-    // PATH DEBUGGER: Crucial for storage/unauthorized troubleshooting
-    console.log("[Storage Debug] Authenticated User UID:", user.uid);
-    console.log("[Storage Debug] Target Folder (userId):", user.uid);
-    console.log("[Storage Debug] Scrapbook ID:", scrapbook.id);
-    
-    // SESSION REFRESH: Force fresh token to prevent stale session unauthorized errors
+    // AUTH GUARD: Force fresh token to prevent stale session errors
     try {
       await user.getIdToken(true);
+      console.log("[Storage Debug] Authenticated User UID:", user.uid);
     } catch (e) {
       console.error("[Storage Debug] Token refresh failed:", e);
     }
 
     const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
-    console.log("[Storage Debug] Full Target Path:", storagePath);
+    console.log("[Storage Debug] Target Path:", storagePath);
 
-    const MAX_SIZE = 5 * 1024 * 1024; // 5MB limit matching Security Rules
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB limit
     if (blob.size > MAX_SIZE) {
       toast({
         variant: "destructive",
         title: "File Too Large",
-        description: "Please select a file smaller than 5MB.",
+        description: "Please select a file smaller than 10MB.",
       });
       return;
     }
@@ -189,9 +185,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     setCurrentMediaType(type);
 
     try {
-      // Modular SDK Reference initialization
       const storageRef = ref(storage, storagePath);
-      
       const metadata = {
         contentType: blob.type || (type === 'image' ? 'image/jpeg' : type === 'video' ? 'video/mp4' : 'audio/mpeg')
       };
@@ -212,9 +206,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
           
           let errorMessage = "An unexpected error occurred.";
           if (error.code === 'storage/unauthorized') {
-            errorMessage = "Permission Denied. Ensure your path UID matches your Auth UID.";
-          } else if (error.code === 'storage/quota-exceeded') {
-            errorMessage = "Storage quota exceeded.";
+            errorMessage = "Permission Denied. Ensure you are logged in.";
           }
 
           toast({ 

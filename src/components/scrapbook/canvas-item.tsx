@@ -1,14 +1,14 @@
 
 "use client";
 
-import { useState, useRef, type MouseEvent, useEffect } from "react";
+import { useState, useRef, type MouseEvent } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { doc, getFirestore } from "firebase/firestore";
 import { ref, deleteObject } from "firebase/storage";
 import { useStorage } from "@/firebase";
-import { Trash2, FlipHorizontal, Move, Music, Play } from "lucide-react";
+import { Trash2, FlipHorizontal, Move, Music } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import {
@@ -108,7 +108,6 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
     
     onUpdatePosition(item.id, finalX, finalY);
 
-    // Auto-save the final position
     debouncedUpdate(scrapbookId, pageId, item.id, {
       x: finalX,
       y: finalY
