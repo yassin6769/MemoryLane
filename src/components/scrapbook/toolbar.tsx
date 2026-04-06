@@ -106,6 +106,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
   const handleMediaClick = (type: 'image' | 'video' | 'audio') => {
     setCurrentMediaType(type);
+    // Use setTimeout to ensure state is set before file dialog opens
     setTimeout(() => {
         fileInputRef.current?.click();
     }, 50);
@@ -123,7 +124,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(chunks, { type: 'audio/webm' });
-        await uploadMediaBlob(audioBlob, 'voice_memo.webm', 'audio');
+        await uploadMediaBlob(audioBlob, `voice_memo_${Date.now()}.webm`, 'audio');
         stream.getTracks().forEach(track => track.stop());
       };
 
@@ -170,30 +171,24 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       return;
     }
 
-    /**
-     * DEEP PATH DEBUGGING
-     */
-    console.log("[Firebase Storage Debug] Auth UID:", user.uid);
-    const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
-    console.log("[Firebase Storage Debug] Target Path:", storagePath);
-
+    // SESSION REFRESH: Ensure token is fresh to avoid storage/unauthorized
     try {
-      // Force refresh token to ensure session is active
-      const idToken = await user.getIdToken(true);
-      if (!idToken) throw new Error("Could not verify session.");
+      await user.getIdToken(true);
     } catch (e) {
-      console.error("[Auth Guard] Session expired or invalid:", e);
+      console.error("[Auth Guard] Session expired:", e);
       toast({ variant: "destructive", title: "Session Expired", description: "Please log in again." });
       return;
     }
 
-    // Client-side size validation (5MB limit)
-    const MAX_SIZE = 5 * 1024 * 1024;
+    const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
+    console.log("[Firebase Storage Debug] Path:", storagePath);
+
+    const MAX_SIZE = 10 * 1024 * 1024; // Increased to 10MB for video/audio
     if (blob.size > MAX_SIZE) {
       toast({
         variant: "destructive",
         title: "File Too Large",
-        description: "Please select a file smaller than 5MB.",
+        description: "Please select a file smaller than 10MB.",
       });
       return;
     }
@@ -203,7 +198,13 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
     try {
       const storageRef = ref(storage, storagePath);
-      const uploadTask = uploadBytesResumable(storageRef, blob);
+      
+      // Explicitly set metadata to help browser rendering and security rules
+      const metadata = {
+        contentType: blob.type || (type === 'image' ? 'image/jpeg' : type === 'video' ? 'video/mp4' : 'audio/mpeg')
+      };
+
+      const uploadTask = uploadBytesResumable(storageRef, blob, metadata);
 
       uploadTask.on('state_changed', 
         (snapshot) => {
@@ -212,31 +213,11 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         }, 
         (error: StorageError) => {
           setUploadProgress(null);
-          
-          // CRITICAL: Log the raw server response to debug "unauthorized" errors
-          const customData = (error as any).customData;
-          if (customData && customData.serverResponse) {
-             console.error("[Firebase Storage Debug] Raw Server Response:", customData.serverResponse);
-          } else {
-             console.error("[Firebase Storage Error]", error);
-          }
+          console.error("[Firebase Storage Error]", error);
           
           let errorMessage = "An unexpected error occurred.";
-          
-          switch (error.code) {
-            case 'storage/unauthorized':
-              errorMessage = "Permission denied. Check your rules or folder path ownership.";
-              break;
-            case 'storage/canceled':
-              errorMessage = "Upload was canceled.";
-              break;
-            case 'storage/quota-exceeded':
-              errorMessage = "Storage quota exceeded.";
-              break;
-            default:
-              errorMessage = `[${error.code}] ${error.message}`;
-              break;
-          }
+          if (error.code === 'storage/unauthorized') errorMessage = "Permission denied. Please verify your account.";
+          else if (error.code === 'storage/quota-exceeded') errorMessage = "Storage quota exceeded.";
 
           toast({ 
             variant: "destructive", 
@@ -256,8 +237,8 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
             members: scrapbook.members,
             x: 100,
             y: 100,
-            width: type === 'audio' ? 300 : 250,
-            height: type === 'audio' ? 80 : 250,
+            width: type === 'audio' || type === 'text' ? 300 : 250,
+            height: type === 'audio' || type === 'text' ? 100 : 250,
             rotation: 0,
             scaleX: 1,
             scaleY: 1,
@@ -270,6 +251,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
           
           addDocumentNonBlocking(objectsCol, objectData);
 
+          // Auto-set as cover if first image
           if (type === 'image' && (!scrapbook.coverImage || scrapbook.coverImage === "")) {
             const scrapbookRef = doc(db, "scrapbooks", scrapbook.id);
             updateDocumentNonBlocking(scrapbookRef, {
@@ -292,12 +274,11 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     const file = e.target.files?.[0];
     if (!file || !currentMediaType) return;
     await uploadMediaBlob(file, file.name, currentMediaType);
-    e.target.value = '';
+    e.target.value = ''; // Reset input
   };
 
   const saveText = () => {
-    if (!textInput.trim()) return;
-    if (!pageId) return;
+    if (!textInput.trim() || !pageId) return;
 
     const objectsCol = collection(db, "scrapbooks", scrapbook.id, "pages", pageId, "canvasObjects");
     const nextZIndex = items.length > 0 ? Math.max(...items.map((i: any) => i.zIndex || 0)) + 1 : 1;
@@ -315,8 +296,8 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       members: scrapbook.members,
       x: 150,
       y: 150,
-      width: 250,
-      height: 80,
+      width: 280,
+      height: 120,
       rotation: 0,
       scaleX: 1,
       scaleY: 1,
@@ -327,6 +308,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
     setTextInput("");
     setIsTextDialogOpen(false);
+    toast({ title: "Text added!" });
   };
 
   return (
@@ -336,7 +318,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
           <div className="flex justify-between text-xs font-medium">
             <span className="animate-pulse flex items-center gap-2">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                Uploading {currentMediaType}...
+                Processing {currentMediaType}...
             </span>
             <span>{Math.round(uploadProgress)}%</span>
           </div>
@@ -348,7 +330,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         <div className="w-full bg-destructive/10 border border-destructive/20 p-2 rounded-lg flex items-center justify-between animate-in fade-in slide-in-from-top-2">
             <div className="flex items-center gap-3">
                 <div className="h-3 w-3 rounded-full bg-destructive animate-pulse" />
-                <span className="text-sm font-medium text-destructive">Recording Voice Memo...</span>
+                <span className="text-sm font-medium text-destructive">Recording Memo...</span>
             </div>
             <Button variant="destructive" size="sm" onClick={stopRecording} className="h-8 gap-2">
                 <CircleStop className="h-4 w-4" />
@@ -387,17 +369,17 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
             className="hidden"
             accept={
                 currentMediaType === 'image' 
-                ? 'image/png,image/jpeg,image/jpg' 
+                ? 'image/*' 
                 : currentMediaType === 'video' 
-                ? 'video/mp4,video/quicktime' 
-                : 'audio/mpeg,audio/wav,audio/m4a'
+                ? 'video/*' 
+                : 'audio/*'
             }
             onChange={onFileChange}
           />
           
           <Button variant="outline" size="sm" onClick={() => handleMediaClick('image')} disabled={scrapbook?.isFinalized || isRecording}>
             <ImagePlus className="mr-2 h-4 w-4" />
-            Image
+            Photo
           </Button>
           <Button variant="outline" size="sm" onClick={() => setIsTextDialogOpen(true)} disabled={scrapbook?.isFinalized || isRecording}>
             <Type className="mr-2 h-4 w-4" />
@@ -422,14 +404,14 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleMediaClick('audio')} className="gap-2">
                     <FileAudio className="h-4 w-4" />
-                    Select Audio File
+                    Upload Audio File
                 </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           
-          <div className="h-6 border-l mx-2" />
+          <div className="h-6 border-l mx-2 hidden sm:block" />
           
-          <div className="flex -space-x-2 mr-2">
+          <div className="hidden sm:flex -space-x-2 mr-2">
             {Object.keys(scrapbook?.members || {}).slice(0, 3).map((uid) => (
               <Avatar key={uid} className="h-8 w-8 border-2 border-background">
                 <AvatarImage src={`https://picsum.photos/seed/${uid}/40/40`} />
@@ -445,7 +427,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
           
           <Button size="sm" onClick={handleFinalize} disabled={isFinalizing || scrapbook?.isFinalized || isRecording}>
             {isFinalizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-            {scrapbook?.isFinalized ? "Finalized" : "Finalize Design"}
+            {scrapbook?.isFinalized ? "Finalized" : "Finalize"}
           </Button>
         </div>
       </div>
@@ -459,11 +441,11 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       <Dialog open={isTextDialogOpen} onOpenChange={setIsTextDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Text to Canvas</DialogTitle>
+            <DialogTitle>Add Story Text</DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <Input 
-              placeholder="What's the story?" 
+              placeholder="What's the story behind this moment?" 
               value={textInput}
               onChange={(e) => setTextInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && saveText()}
@@ -471,7 +453,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsTextDialogOpen(false)}>Cancel</Button>
-            <Button onClick={saveText}>Add to Canvas</Button>
+            <Button onClick={saveText}>Add to Page</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -484,13 +466,13 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
               Discard changes?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              You haven't finalized this design yet. If you leave now, the scrapbook will remain in an unfinalized state. You can continue editing it later from the dashboard.
+              Your edits are automatically saved, but you haven't finalized this version yet. You can return to finish it anytime from your dashboard.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep Editing</AlertDialogCancel>
+            <AlertDialogCancel>Continue Editing</AlertDialogCancel>
             <AlertDialogAction onClick={confirmBack} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Exit to Dashboard
+              Exit
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

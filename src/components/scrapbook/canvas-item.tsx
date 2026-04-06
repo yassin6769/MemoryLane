@@ -8,7 +8,7 @@ import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { doc, getFirestore } from "firebase/firestore";
 import { ref, deleteObject } from "firebase/storage";
 import { useStorage } from "@/firebase";
-import { Trash2, FlipHorizontal, Move } from "lucide-react";
+import { Trash2, FlipHorizontal, Move, Music, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import {
@@ -89,8 +89,8 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
     let newY = startY + dy;
 
     // Boundary constraints
-    newX = Math.max(0, Math.min(newX, parentRect.width - (item.width * (Math.abs(item.scaleX) || 1))));
-    newY = Math.max(0, Math.min(newY, parentRect.height - (item.height * (item.scaleY || 1))));
+    newX = Math.max(-50, Math.min(newX, parentRect.width - 50));
+    newY = Math.max(-50, Math.min(newY, parentRect.height - 50));
 
     itemRef.current.style.left = `${newX}px`;
     itemRef.current.style.top = `${newY}px`;
@@ -135,9 +135,9 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
       }
       const docRef = doc(db, "scrapbooks", scrapbookId, "pages", pageId, "canvasObjects", item.id);
       deleteDocumentNonBlocking(docRef);
-      toast({ title: "Item Removed" });
+      toast({ title: "Removed from page" });
     } catch (error) {
-      toast({ variant: "destructive", title: "Deletion Failed" });
+      toast({ variant: "destructive", title: "Action Failed" });
     } finally {
       setIsDeleting(false);
       setIsDeleteDialogOpen(false);
@@ -156,12 +156,12 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
       case "image":
         return (
           <div 
-            className="relative w-full h-full overflow-hidden rounded-sm pointer-events-none select-none bg-white"
+            className="relative w-full h-full overflow-hidden rounded-sm pointer-events-none select-none bg-muted/20"
             style={contentStyles}
           >
             <Image
               src={item.mediaUri}
-              alt="Memory"
+              alt="Scrapbook Memory"
               fill
               className="object-cover"
               unoptimized
@@ -171,16 +171,16 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
       case "text":
         return (
           <div 
-            className="w-full h-full p-4 flex items-center justify-center pointer-events-none bg-white/20 rounded-lg overflow-hidden"
+            className="w-full h-full p-6 flex items-center justify-center pointer-events-none bg-card/40 rounded-lg overflow-hidden backdrop-blur-[1px]"
             style={contentStyles}
           >
             <p className={cn(
-              "text-center leading-tight text-foreground/80 whitespace-pre-wrap",
+              "text-center leading-relaxed text-foreground/90 whitespace-pre-wrap",
               item.fontFamily || "font-serif",
               item.isBold && "font-bold",
               item.isUnderline && "underline"
             )}
-            style={{ fontSize: `${item.fontSize || 24}px` }}
+            style={{ fontSize: `${item.fontSize || 22}px` }}
             >
               {item.text}
             </p>
@@ -189,7 +189,7 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
       case "video":
         return (
           <div 
-            className="relative w-full h-full pointer-events-none rounded-sm bg-black overflow-hidden"
+            className="relative w-full h-full pointer-events-none rounded-sm bg-black overflow-hidden shadow-inner"
             style={contentStyles}
           >
             <video 
@@ -202,13 +202,25 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
       case "audio":
         return (
           <div 
-            className="w-full h-full flex flex-col items-center justify-center p-4 bg-primary/5 rounded-lg border border-primary/20 pointer-events-none shadow-sm"
+            className="w-full h-full flex flex-col items-center justify-center p-6 bg-primary/10 rounded-xl border border-primary/30 pointer-events-none shadow-sm overflow-hidden"
             style={contentStyles}
           >
-            <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center mb-2 shadow-sm">
-              <div className="w-4 h-4 bg-white rounded-full animate-pulse" />
+            <div className="h-12 w-12 rounded-full bg-primary flex items-center justify-center mb-3 shadow-md">
+              <div className="relative">
+                <Music className="h-5 w-5 text-white animate-bounce" />
+                <div className="absolute inset-0 h-full w-full bg-white/20 rounded-full animate-ping" />
+              </div>
             </div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Voice Memo</p>
+            <p className="text-[12px] font-bold uppercase tracking-[0.2em] text-primary">Voice Memo</p>
+            <div className="mt-3 flex gap-1 items-end h-4">
+               {[0.6, 0.8, 0.4, 1.0, 0.5, 0.9, 0.7].map((h, i) => (
+                 <div 
+                  key={i} 
+                  className="w-1 bg-primary/40 rounded-full animate-pulse" 
+                  style={{ height: `${h * 100}%`, animationDelay: `${i * 0.1}s` }} 
+                />
+               ))}
+            </div>
           </div>
         );
       default:
@@ -225,7 +237,7 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
           "absolute transition-shadow duration-300 transform-gpu select-none",
           isDragging ? "cursor-grabbing shadow-2xl z-[9999]" : "cursor-grab shadow-sm hover:shadow-md",
           isSelected ? "ring-2 ring-primary ring-offset-2 z-[999] shadow-xl" : "",
-          item.type === "text" ? "bg-transparent" : "bg-white p-2 border border-muted/30 rounded-sm"
+          item.type === "text" || item.type === "audio" ? "bg-transparent" : "bg-white p-2 border border-muted/30 rounded-sm"
         )}
         style={{
           left: `${item.x}px`,
@@ -256,24 +268,24 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
             <Button 
               variant="destructive" 
               size="icon" 
-              className="absolute -top-3 -right-3 h-6 w-6 rounded-full shadow-lg action-button pointer-events-auto z-[1002]"
+              className="absolute -top-3 -right-3 h-7 w-7 rounded-full shadow-lg action-button pointer-events-auto z-[1002]"
               onClick={(e) => { e.stopPropagation(); setIsDeleteDialogOpen(true); }}
             >
-              <Trash2 className="h-3 w-3" />
+              <Trash2 className="h-3.5 w-3.5" />
             </Button>
 
             <Button 
               variant="secondary" 
               size="icon" 
-              className="absolute -bottom-3 -right-3 h-6 w-6 rounded-full shadow-lg action-button pointer-events-auto z-[1002]"
+              className="absolute -bottom-3 -right-3 h-7 w-7 rounded-full shadow-lg action-button pointer-events-auto z-[1002]"
               onClick={handleFlip}
             >
-              <FlipHorizontal className="h-3 w-3" />
+              <FlipHorizontal className="h-3.5 w-3.5" />
             </Button>
 
-            <div className="absolute inset-0 border border-dashed border-primary/40 rounded-sm pointer-events-none" />
+            <div className="absolute inset-0 border-2 border-dashed border-primary/40 rounded-sm pointer-events-none" />
             <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
-              <Move className="h-12 w-12 text-primary" />
+              <Move className="h-10 w-10 text-primary" />
             </div>
           </>
         )}
@@ -284,7 +296,7 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
           <AlertDialogHeader>
             <AlertDialogTitle>Remove this memory?</AlertDialogTitle>
             <AlertDialogDescription>
-              This item will be permanently deleted from your scrapbook page.
+              This object will be permanently removed from your current page.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -294,7 +306,7 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={isDeleting}
             >
-              {isDeleting ? "Removing..." : "Delete Permanently"}
+              {isDeleting ? "Removing..." : "Confirm Removal"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
