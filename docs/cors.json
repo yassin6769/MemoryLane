@@ -1,12 +1,6 @@
 [
   {
-    "origin": [
-      "http://localhost:9002",
-      "http://localhost:3000",
-      "https://*.webstation.google.com",
-      "https://*.firebaseapp.com",
-      "https://*.web.app"
-    ],
+    "origin": ["*"],
     "method": ["GET", "PUT", "POST", "DELETE", "HEAD", "OPTIONS"],
     "responseHeader": ["Content-Type", "x-goog-resumable", "Authorization"],
     "maxAgeSeconds": 3600

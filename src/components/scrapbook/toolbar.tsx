@@ -200,14 +200,14 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         (error: StorageError) => {
           setUploadProgress(null);
           
-          // ADVANCED LOGGING: Capture the raw server response for pinpoint accuracy
+          // ADVANCED LOGGING: Capture the raw server payload for precise error fixing
           const serverResponse = (error as any).customData?.serverResponse;
           console.error("[Storage Error] Code:", error.code);
-          console.error("[Storage Error] Detailed Server Payload:", serverResponse);
+          console.error("[Storage Error] Detailed Payload:", serverResponse);
           
           let errorMessage = "An unexpected error occurred.";
           if (error.code === 'storage/unauthorized') {
-            errorMessage = "Permission Denied. Please ensure your storage rules are published.";
+            errorMessage = "Permission Denied. Please ensure your storage rules are correctly applied.";
           }
 
           toast({ 
