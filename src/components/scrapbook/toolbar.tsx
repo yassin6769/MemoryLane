@@ -106,7 +106,6 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
   const handleMediaClick = (type: 'image' | 'video' | 'audio') => {
     setCurrentMediaType(type);
-    // Use setTimeout to ensure state is set before file dialog opens
     setTimeout(() => {
         fileInputRef.current?.click();
     }, 50);
@@ -152,43 +151,36 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
   };
 
   const uploadMediaBlob = async (blob: Blob | File, fileName: string, type: 'image' | 'video' | 'audio') => {
-    if (!storage || !storage.app.options.storageBucket) {
+    if (!storage || !user || !pageId) {
         toast({ 
             variant: "destructive", 
-            title: "Configuration Error", 
-            description: "Firebase Storage is not properly initialized." 
+            title: "Upload Blocked", 
+            description: "Missing required services or session. Please log in again." 
         });
         return;
     }
 
-    if (!user) {
-      toast({ variant: "destructive", title: "Upload Failed", description: "You must be logged in to upload media." });
-      return;
-    }
-
-    if (!pageId) {
-      toast({ variant: "destructive", title: "Upload Failed", description: "No active page selected." });
-      return;
-    }
-
-    // SESSION REFRESH: Ensure token is fresh to avoid storage/unauthorized
+    // PATH DEBUGGER: Crucial for storage/unauthorized troubleshooting
+    console.log("[Storage Debug] Authenticated User UID:", user.uid);
+    console.log("[Storage Debug] Target Folder (userId):", user.uid);
+    console.log("[Storage Debug] Scrapbook ID:", scrapbook.id);
+    
+    // SESSION REFRESH: Force fresh token to prevent stale session unauthorized errors
     try {
       await user.getIdToken(true);
     } catch (e) {
-      console.error("[Auth Guard] Session expired:", e);
-      toast({ variant: "destructive", title: "Session Expired", description: "Please log in again." });
-      return;
+      console.error("[Storage Debug] Token refresh failed:", e);
     }
 
     const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
-    console.log("[Firebase Storage Debug] Path:", storagePath);
+    console.log("[Storage Debug] Full Target Path:", storagePath);
 
-    const MAX_SIZE = 10 * 1024 * 1024; // Increased to 10MB for video/audio
+    const MAX_SIZE = 5 * 1024 * 1024; // 5MB limit matching Security Rules
     if (blob.size > MAX_SIZE) {
       toast({
         variant: "destructive",
         title: "File Too Large",
-        description: "Please select a file smaller than 10MB.",
+        description: "Please select a file smaller than 5MB.",
       });
       return;
     }
@@ -197,9 +189,9 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     setCurrentMediaType(type);
 
     try {
+      // Modular SDK Reference initialization
       const storageRef = ref(storage, storagePath);
       
-      // Explicitly set metadata to help browser rendering and security rules
       const metadata = {
         contentType: blob.type || (type === 'image' ? 'image/jpeg' : type === 'video' ? 'video/mp4' : 'audio/mpeg')
       };
@@ -213,11 +205,17 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         }, 
         (error: StorageError) => {
           setUploadProgress(null);
-          console.error("[Firebase Storage Error]", error);
+          console.error("[Storage Error] Full Object:", error);
+          if (error.customData?.serverResponse) {
+            console.error("[Storage Error] Server Response:", error.customData.serverResponse);
+          }
           
           let errorMessage = "An unexpected error occurred.";
-          if (error.code === 'storage/unauthorized') errorMessage = "Permission denied. Please verify your account.";
-          else if (error.code === 'storage/quota-exceeded') errorMessage = "Storage quota exceeded.";
+          if (error.code === 'storage/unauthorized') {
+            errorMessage = "Permission Denied. Ensure your path UID matches your Auth UID.";
+          } else if (error.code === 'storage/quota-exceeded') {
+            errorMessage = "Storage quota exceeded.";
+          }
 
           toast({ 
             variant: "destructive", 
@@ -251,7 +249,6 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
           
           addDocumentNonBlocking(objectsCol, objectData);
 
-          // Auto-set as cover if first image
           if (type === 'image' && (!scrapbook.coverImage || scrapbook.coverImage === "")) {
             const scrapbookRef = doc(db, "scrapbooks", scrapbook.id);
             updateDocumentNonBlocking(scrapbookRef, {
@@ -274,7 +271,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     const file = e.target.files?.[0];
     if (!file || !currentMediaType) return;
     await uploadMediaBlob(file, file.name, currentMediaType);
-    e.target.value = ''; // Reset input
+    e.target.value = ''; 
   };
 
   const saveText = () => {
