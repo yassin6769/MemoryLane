@@ -167,8 +167,8 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
     const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
     
-    // DEBUG LOGGING: Verify path and user consistency
-    console.log("[Storage Debug] User UID:", user.uid);
+    // DIAGNOSTIC LOGGING: Verify Auth UID vs Path construction
+    console.log("[Storage Debug] Auth UID:", user.uid);
     console.log("[Storage Debug] Target Path:", storagePath);
 
     const MAX_SIZE = 10 * 1024 * 1024; // 10MB limit
@@ -200,14 +200,14 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         (error: StorageError) => {
           setUploadProgress(null);
           
-          // ADVANCED LOGGING: Capture the raw server payload for precise error fixing
+          // ADVANCED LOGGING: Capture the raw server response for pinpoint accuracy
           const serverResponse = (error as any).customData?.serverResponse;
           console.error("[Storage Error] Code:", error.code);
-          console.error("[Storage Error] Detailed Payload:", serverResponse);
+          console.error("[Storage Error] Detailed Server Payload:", serverResponse);
           
           let errorMessage = "An unexpected error occurred.";
           if (error.code === 'storage/unauthorized') {
-            errorMessage = "Unauthorized. The Storage Rules denied access to this path.";
+            errorMessage = "Permission Denied. Please ensure your storage rules are published.";
           }
 
           toast({ 
