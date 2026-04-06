@@ -6,23 +6,34 @@ service firebase.storage {
     /**
      * MemoryLane Storage Rules
      * 
-     * TEMPORARY DEBUG RULE: Allow all authenticated uploads to isolate CORS/Initialization issues.
-     * This rule should be narrowed after verifying that uploads work.
+     * Hierarchical Security Model:
+     * 1. Path: /scrapbooks/{scrapbookId}/{userId}/{fileName}
+     * 2. Read: Any authenticated user (supports sharing/viewing)
+     * 3. Write/Delete: Only the authenticated owner of the specific userId folder
      */
     
-    match /{allPaths=**} {
-      // Allow read/write if authenticated
-      allow read, write: if request.auth != null;
-    }
-
-    // Original structure kept for reference when reverting to strict rules
-    /*
     match /scrapbooks/{scrapbookId}/{userId}/{fileName} {
+      
+      // Allow viewing by any authenticated user for collaboration
       allow read: if request.auth != null;
+      
+      // Strict write access control
       allow write: if request.auth != null 
                   && request.auth.uid == userId
-                  && request.resource.size < 5 * 1024 * 1024;
+                  && (
+                    request.resource.contentType.matches('image/.*') ||
+                    request.resource.contentType.matches('video/.*') ||
+                    request.resource.contentType.matches('audio/.*')
+                  )
+                  && request.resource.size < 5 * 1024 * 1024; // 5MB limit
+      
+      // Allow delete only by owner
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
-    */
+
+    // Default deny for everything else
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
   }
 }

@@ -170,6 +170,19 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       return;
     }
 
+    /**
+     * ADVANCED SECURITY CHECK: Verify Auth Token before upload
+     * This prevents 'storage/unauthorized' due to expired session tokens.
+     */
+    try {
+      const idToken = await user.getIdToken(true); // Force refresh token
+      if (!idToken) throw new Error("Could not verify session.");
+    } catch (e) {
+      console.error("[Auth Guard] Session expired or invalid:", e);
+      toast({ variant: "destructive", title: "Session Expired", description: "Please log in again." });
+      return;
+    }
+
     // Client-side size validation (5MB limit)
     const MAX_SIZE = 5 * 1024 * 1024;
     if (blob.size > MAX_SIZE) {
@@ -185,7 +198,10 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     setCurrentMediaType(type);
 
     try {
-      // Path structure: /scrapbooks/{scrapbookId}/{userId}/{fileName}
+      /**
+       * PATH VERIFICATION: The userId in the path MUST exactly match user.uid 
+       * to satisfy Firebase Storage Security Rules.
+       */
       const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
       const storageRef = ref(storage, storagePath);
       const uploadTask = uploadBytesResumable(storageRef, blob);
@@ -198,7 +214,9 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         (error: StorageError) => {
           setUploadProgress(null);
           
-          // ADVANCED LOGGING: Capture raw server response to debug "Unknown" errors
+          /**
+           * CRITICAL LOGGING: Capture raw server response to debug 'storage/unauthorized'
+           */
           const customData = (error as any).customData;
           if (customData && customData.serverResponse) {
              console.error("[Firebase Storage Debug] Raw Server Response:", customData.serverResponse);
@@ -210,19 +228,13 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
           
           switch (error.code) {
             case 'storage/unauthorized':
-              errorMessage = "Permission denied. Please check security rules.";
+              errorMessage = "Permission denied. Check your path or ensure you are the owner.";
               break;
             case 'storage/canceled':
               errorMessage = "Upload was canceled.";
               break;
             case 'storage/quota-exceeded':
-              errorMessage = "Storage quota exceeded. Please try again later.";
-              break;
-            case 'storage/invalid-checksum':
-              errorMessage = "File integrity check failed. Please retry.";
-              break;
-            case 'storage/retry-limit-exceeded':
-              errorMessage = "Max retry limit reached. Check your connection.";
+              errorMessage = "Storage quota exceeded.";
               break;
             default:
               errorMessage = `[${error.code}] ${error.message}`;
