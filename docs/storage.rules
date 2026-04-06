@@ -4,8 +4,8 @@ service firebase.storage {
     
     /**
      * NUCLEAR PERMISSION FIX
-     * Allows all users (even unauthenticated ones) to read and write to the /scrapbooks path.
-     * Use this for development to bypass "Unauthorized" errors.
+     * Allows all users (even unauthenticated ones for this test) to read and write to the /scrapbooks path.
+     * Use this to determine if the issue is rule-based or configuration-based.
      * Path structure: /scrapbooks/{scrapbookId}/{userId}/{fileName}
      */
     match /scrapbooks/{allPaths=**} {

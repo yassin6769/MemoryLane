@@ -4,8 +4,8 @@
       "http://localhost:9002",
       "http://localhost:3000",
       "https://*.webstation.google.com",
-      "https://studio-4424744590-af358.web.app",
-      "https://studio-4424744590-af358.firebaseapp.com"
+      "https://*.firebaseapp.com",
+      "https://*.web.app"
     ],
     "method": ["GET", "PUT", "POST", "DELETE", "HEAD", "OPTIONS"],
     "responseHeader": ["Content-Type", "x-goog-resumable", "Authorization"],

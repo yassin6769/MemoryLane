@@ -158,7 +158,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         return;
     }
 
-    // CRITICAL: Force Token Refresh to ensure session is valid and authorized
+    // CRITICAL: Force Token Refresh to ensure session is active and recognized by rules
     try {
       await user.getIdToken(true);
     } catch (e) {
@@ -168,10 +168,10 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
     
     // DEBUG LOGGING: Verify path and user consistency
-    console.log("[Storage Debug] Current User UID:", user.uid);
+    console.log("[Storage Debug] User UID:", user.uid);
     console.log("[Storage Debug] Target Path:", storagePath);
 
-    const MAX_SIZE = 10 * 1024 * 1024; // Increased to 10MB for video/audio
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB limit
     if (blob.size > MAX_SIZE) {
       toast({
         variant: "destructive",
@@ -199,14 +199,15 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         }, 
         (error: StorageError) => {
           setUploadProgress(null);
-          // ADVANCED LOGGING: Print full server response to catch CORS or config errors
+          
+          // ADVANCED LOGGING: Capture the raw server payload for precise error fixing
           const serverResponse = (error as any).customData?.serverResponse;
           console.error("[Storage Error] Code:", error.code);
-          console.error("[Storage Error] Server Payload:", serverResponse);
+          console.error("[Storage Error] Detailed Payload:", serverResponse);
           
           let errorMessage = "An unexpected error occurred.";
           if (error.code === 'storage/unauthorized') {
-            errorMessage = "Unauthorized. Please ensure Storage Rules allow this path.";
+            errorMessage = "Unauthorized. The Storage Rules denied access to this path.";
           }
 
           toast({ 
