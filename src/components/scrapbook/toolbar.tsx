@@ -161,22 +161,23 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     // CRITICAL: Force Token Refresh to ensure session is active and recognized by rules
     try {
       await user.getIdToken(true);
+      console.log("[Auth] Token refreshed successfully.");
     } catch (e) {
       console.error("[Auth] Token refresh failed:", e);
     }
 
     const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
     
-    // DIAGNOSTIC LOGGING: Verify Auth UID vs Path construction
+    // DIAGNOSTIC LOGGING
     console.log("[Storage Debug] Auth UID:", user.uid);
     console.log("[Storage Debug] Target Path:", storagePath);
 
-    const MAX_SIZE = 10 * 1024 * 1024; // 10MB limit
+    const MAX_SIZE = 20 * 1024 * 1024; // Increased to 20MB
     if (blob.size > MAX_SIZE) {
       toast({
         variant: "destructive",
         title: "File Too Large",
-        description: "Please select a file smaller than 10MB.",
+        description: "Please select a file smaller than 20MB.",
       });
       return;
     }
@@ -200,14 +201,16 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         (error: StorageError) => {
           setUploadProgress(null);
           
-          // ADVANCED LOGGING: Capture the raw server payload for precise error fixing
+          // Capture raw server response for precision debugging
           const serverResponse = (error as any).customData?.serverResponse;
           console.error("[Storage Error] Code:", error.code);
-          console.error("[Storage Error] Detailed Payload:", serverResponse);
+          console.error("[Storage Error] Full Response:", serverResponse);
           
           let errorMessage = "An unexpected error occurred.";
           if (error.code === 'storage/unauthorized') {
             errorMessage = "Permission Denied. Please ensure your storage rules are correctly applied.";
+          } else if (error.code === 'storage/canceled') {
+            errorMessage = "Upload canceled.";
           }
 
           toast({ 
