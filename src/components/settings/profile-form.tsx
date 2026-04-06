@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -36,7 +36,7 @@ const profileSchema = z.object({
   username: z.string()
     .min(3, "Username must be at least 3 characters.")
     .regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, and underscores."),
-  age: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
+  age: z.string().refine((val) => !val || (!isNaN(Number(val)) && Number(val) > 0), {
     message: "Please enter a valid age (number).",
   }),
   gender: z.enum(["Male", "Female", "Other"]),
@@ -53,21 +53,38 @@ export function ProfileForm({ profile }: { profile: any }) {
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      displayName: profile?.displayName || "",
-      username: profile?.username || "",
-      age: profile?.age?.toString() || "",
-      gender: profile?.gender || "Other",
+      displayName: "",
+      username: "",
+      age: "",
+      gender: "Other",
     },
   });
+
+  // CRITICAL FIX: Ensure form updates when profile data arrives
+  useEffect(() => {
+    if (profile) {
+      form.reset({
+        displayName: profile.displayName || "",
+        username: profile.username || "",
+        age: profile.age?.toString() || "",
+        gender: profile.gender || "Other",
+      });
+    }
+  }, [profile, form]);
 
   async function onSubmit(values: ProfileFormValues) {
     if (!user) return;
     setIsLoading(true);
 
     try {
+      const normalizedUsername = values.username.toLowerCase();
+
       // 1. Check Username Uniqueness (if changed)
-      if (values.username !== profile?.username) {
-        const q = query(collection(db, "users"), where("username", "==", values.username));
+      if (normalizedUsername !== profile?.username) {
+        const q = query(
+          collection(db, "users"), 
+          where("username", "==", normalizedUsername)
+        );
         const querySnapshot = await getDocs(q);
         
         // Ensure the matching document isn't just the current user
@@ -84,8 +101,8 @@ export function ProfileForm({ profile }: { profile: any }) {
       const userRef = doc(db, "users", user.uid);
       await updateDoc(userRef, {
         displayName: values.displayName,
-        username: values.username.toLowerCase(),
-        age: Number(values.age),
+        username: normalizedUsername,
+        age: values.age ? Number(values.age) : null,
         gender: values.gender,
         updatedAt: serverTimestamp(),
       });
@@ -206,7 +223,7 @@ export function ProfileForm({ profile }: { profile: any }) {
                     <FormControl>
                       <RadioGroup
                         onValueChange={field.onChange}
-                        defaultValue={field.value}
+                        value={field.value}
                         className="flex gap-4"
                       >
                         <FormItem className="flex items-center space-x-2 space-y-0">
