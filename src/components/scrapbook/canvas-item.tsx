@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, type MouseEvent } from "react";
@@ -8,7 +7,7 @@ import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { doc, getFirestore } from "firebase/firestore";
 import { ref, deleteObject } from "firebase/storage";
 import { useStorage } from "@/firebase";
-import { Trash2, FlipHorizontal, Move, Music } from "lucide-react";
+import { Trash2, FlipHorizontal, Move, Music, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import {
@@ -89,8 +88,8 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
     let newY = startY + dy;
 
     // Boundary constraints
-    newX = Math.max(-50, Math.min(newX, parentRect.width - 50));
-    newY = Math.max(-50, Math.min(newY, parentRect.height - 50));
+    newX = Math.max(-100, Math.min(newX, parentRect.width - 50));
+    newY = Math.max(-100, Math.min(newY, parentRect.height - 50));
 
     itemRef.current.style.left = `${newX}px`;
     itemRef.current.style.top = `${newY}px`;
@@ -188,7 +187,7 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
       case "video":
         return (
           <div 
-            className="relative w-full h-full pointer-events-none rounded-sm bg-black overflow-hidden shadow-inner"
+            className="relative w-full h-full pointer-events-none rounded-sm bg-black overflow-hidden shadow-inner group/video"
             style={contentStyles}
           >
             <video 
@@ -196,23 +195,26 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
               className="w-full h-full object-cover"
               muted autoPlay loop playsInline
             />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover/video:opacity-100 transition-opacity">
+              <Play className="h-10 w-10 text-white/50 fill-white/20" />
+            </div>
           </div>
         );
       case "audio":
         return (
           <div 
-            className="w-full h-full flex flex-col items-center justify-center p-6 bg-primary/10 rounded-xl border border-primary/30 pointer-events-none shadow-sm overflow-hidden"
+            className="w-full h-full flex flex-col items-center justify-center p-4 bg-primary/10 rounded-xl border-2 border-primary/20 pointer-events-none shadow-sm overflow-hidden"
             style={contentStyles}
           >
-            <div className="h-12 w-12 rounded-full bg-primary flex items-center justify-center mb-3 shadow-md">
+            <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center mb-2 shadow-md">
               <div className="relative">
-                <Music className="h-5 w-5 text-white animate-bounce" />
+                <Music className="h-4 w-4 text-white animate-bounce" />
                 <div className="absolute inset-0 h-full w-full bg-white/20 rounded-full animate-ping" />
               </div>
             </div>
-            <p className="text-[12px] font-bold uppercase tracking-[0.2em] text-primary">Voice Memo</p>
-            <div className="mt-3 flex gap-1 items-end h-4">
-               {[0.6, 0.8, 0.4, 1.0, 0.5, 0.9, 0.7].map((h, i) => (
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Voice Memo</p>
+            <div className="mt-2 flex gap-1 items-end h-6">
+               {[0.6, 0.8, 0.4, 1.0, 0.5, 0.9, 0.7, 0.3, 0.6].map((h, i) => (
                  <div 
                   key={i} 
                   className="w-1 bg-primary/40 rounded-full animate-pulse" 

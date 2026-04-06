@@ -158,7 +158,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         return;
     }
 
-    // CRITICAL: Force Token Refresh to prevent Unauthorized errors
+    // CRITICAL: Force Token Refresh to prevent Unauthorized errors caused by stale sessions
     try {
       await user.getIdToken(true);
     } catch (e) {
@@ -167,11 +167,11 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
     const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
     
-    // Debugging path consistency
+    // Debugging path consistency for troubleshooting
     console.log("[Storage Debug] Target Path:", storagePath);
     console.log("[Storage Debug] Current User UID:", user.uid);
 
-    const MAX_SIZE = 5 * 1024 * 1024; // 5MB limit as requested
+    const MAX_SIZE = 5 * 1024 * 1024; // 5MB limit
     if (blob.size > MAX_SIZE) {
       toast({
         variant: "destructive",
@@ -199,12 +199,14 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         }, 
         (error: StorageError) => {
           setUploadProgress(null);
-          // ADVANCED LOGGING: Expose the raw server response
-          console.error("[Storage Error] Detailed Payload:", (error as any).customData?.serverResponse);
+          // ADVANCED LOGGING: Capture the raw server payload for precise error fixing
+          const serverResponse = (error as any).customData?.serverResponse;
+          console.error("[Storage Error] Code:", error.code);
+          console.error("[Storage Error] Detailed Payload:", serverResponse);
           
           let errorMessage = "An unexpected error occurred.";
           if (error.code === 'storage/unauthorized') {
-            errorMessage = "Permission Denied. Ensure your security rules allow this path.";
+            errorMessage = "Permission Denied. Security rules or CORS may be blocking this path.";
           }
 
           toast({ 
@@ -226,7 +228,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
             x: 100,
             y: 100,
             width: type === 'audio' ? 300 : 250,
-            height: type === 'audio' ? 100 : 250,
+            height: type === 'audio' ? 120 : 250,
             rotation: 0,
             scaleX: 1,
             scaleY: 1,
