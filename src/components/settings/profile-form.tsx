@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -60,7 +59,7 @@ export function ProfileForm({ profile }: { profile: any }) {
     },
   });
 
-  // CRITICAL FIX: Ensure form updates when profile data arrives
+  // Sync form with loaded profile data
   useEffect(() => {
     if (profile) {
       form.reset({
@@ -79,7 +78,7 @@ export function ProfileForm({ profile }: { profile: any }) {
     try {
       const normalizedUsername = values.username.toLowerCase();
 
-      // 1. Check Username Uniqueness (if changed)
+      // Check Username Uniqueness (if changed)
       if (normalizedUsername !== profile?.username) {
         const q = query(
           collection(db, "users"), 
@@ -97,7 +96,7 @@ export function ProfileForm({ profile }: { profile: any }) {
         }
       }
 
-      // 2. Update Firestore
+      // Update Firestore
       const userRef = doc(db, "users", user.uid);
       await updateDoc(userRef, {
         displayName: values.displayName,

@@ -1,16 +1,6 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    /**
-     * MemoryLane Security Rules
-     * 
-     * Hierarchical security model.
-     * 1. Users own their profiles.
-     * 2. Scrapbooks use a 'members' map for collaboration.
-     * 3. Subcollections inherit permissions from parent Scrapbook.
-     */
 
     function isSignedIn() {
       return request.auth != null;
@@ -32,6 +22,7 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
+      // Added 'list' to allow checking for unique usernames across the collection
       allow get, list, create, update: if isOwner(userId);
       allow delete: if false;
     }

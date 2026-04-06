@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef } from "react";
@@ -17,7 +16,6 @@ import {
   Radio,
   FileAudio
 } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -160,7 +158,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         return;
     }
 
-    // Refresh token to ensure authorization is current
+    // CRITICAL: Force Token Refresh to prevent Unauthorized errors
     try {
       await user.getIdToken(true);
     } catch (e) {
@@ -168,15 +166,17 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     }
 
     const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
-    console.log("[Storage Debug] Path:", storagePath);
-    console.log("[Storage Debug] Auth UID:", user.uid);
+    
+    // Debugging path consistency
+    console.log("[Storage Debug] Target Path:", storagePath);
+    console.log("[Storage Debug] Current User UID:", user.uid);
 
-    const MAX_SIZE = 10 * 1024 * 1024; // 10MB limit
+    const MAX_SIZE = 5 * 1024 * 1024; // 5MB limit as requested
     if (blob.size > MAX_SIZE) {
       toast({
         variant: "destructive",
         title: "File Too Large",
-        description: "Please select a file smaller than 10MB.",
+        description: "Please select a file smaller than 5MB.",
       });
       return;
     }
@@ -199,7 +199,8 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         }, 
         (error: StorageError) => {
           setUploadProgress(null);
-          console.error("[Storage Error]", error);
+          // ADVANCED LOGGING: Expose the raw server response
+          console.error("[Storage Error] Detailed Payload:", (error as any).customData?.serverResponse);
           
           let errorMessage = "An unexpected error occurred.";
           if (error.code === 'storage/unauthorized') {
@@ -224,8 +225,8 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
             members: scrapbook.members,
             x: 100,
             y: 100,
-            width: type === 'audio' || type === 'text' ? 300 : 250,
-            height: type === 'audio' || type === 'text' ? 100 : 250,
+            width: type === 'audio' ? 300 : 250,
+            height: type === 'audio' ? 100 : 250,
             rotation: 0,
             scaleX: 1,
             scaleY: 1,
