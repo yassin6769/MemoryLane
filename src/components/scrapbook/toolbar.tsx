@@ -160,16 +160,16 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         return;
     }
 
-    // AUTH GUARD: Force fresh token to prevent stale session errors
+    // Refresh token to ensure authorization is current
     try {
       await user.getIdToken(true);
-      console.log("[Storage Debug] Authenticated User UID:", user.uid);
     } catch (e) {
-      console.error("[Storage Debug] Token refresh failed:", e);
+      console.error("[Auth] Token refresh failed:", e);
     }
 
     const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
-    console.log("[Storage Debug] Target Path:", storagePath);
+    console.log("[Storage Debug] Path:", storagePath);
+    console.log("[Storage Debug] Auth UID:", user.uid);
 
     const MAX_SIZE = 10 * 1024 * 1024; // 10MB limit
     if (blob.size > MAX_SIZE) {
@@ -199,14 +199,11 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         }, 
         (error: StorageError) => {
           setUploadProgress(null);
-          console.error("[Storage Error] Full Object:", error);
-          if (error.customData?.serverResponse) {
-            console.error("[Storage Error] Server Response:", error.customData.serverResponse);
-          }
+          console.error("[Storage Error]", error);
           
           let errorMessage = "An unexpected error occurred.";
           if (error.code === 'storage/unauthorized') {
-            errorMessage = "Permission Denied. Ensure you are logged in.";
+            errorMessage = "Permission Denied. Ensure your security rules allow this path.";
           }
 
           toast({ 
@@ -241,6 +238,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
           
           addDocumentNonBlocking(objectsCol, objectData);
 
+          // Auto-set cover image if none exists
           if (type === 'image' && (!scrapbook.coverImage || scrapbook.coverImage === "")) {
             const scrapbookRef = doc(db, "scrapbooks", scrapbook.id);
             updateDocumentNonBlocking(scrapbookRef, {
@@ -399,15 +397,6 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
           </DropdownMenu>
           
           <div className="h-6 border-l mx-2 hidden sm:block" />
-          
-          <div className="hidden sm:flex -space-x-2 mr-2">
-            {Object.keys(scrapbook?.members || {}).slice(0, 3).map((uid) => (
-              <Avatar key={uid} className="h-8 w-8 border-2 border-background">
-                <AvatarImage src={`https://picsum.photos/seed/${uid}/40/40`} />
-                <AvatarFallback>U</AvatarFallback>
-              </Avatar>
-            ))}
-          </div>
           
           <Button variant="outline" size="sm" onClick={() => setIsShareOpen(true)}>
             <Share2 className="mr-2 h-4 w-4" />

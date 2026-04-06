@@ -6,13 +6,11 @@ service cloud.firestore {
     /**
      * MemoryLane Security Rules
      * 
-     * Implements a robust, hierarchical security model.
+     * Hierarchical security model.
      * 1. Users own their profiles.
      * 2. Scrapbooks use a 'members' map for collaboration.
-     * 3. Subcollections (pages/objects) inherit permissions from the parent Scrapbook.
+     * 3. Subcollections inherit permissions from parent Scrapbook.
      */
-
-    // --- Helper Functions ---
 
     function isSignedIn() {
       return request.auth != null;
@@ -22,7 +20,6 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Checks if the user has a specific role in the scrapbook
     function hasRole(scrapbookData, roleList) {
       return isSignedIn() && 
              scrapbookData != null && 
@@ -30,55 +27,35 @@ service cloud.firestore {
              scrapbookData.members[request.auth.uid] in roleList;
     }
 
-    // Fetches the parent scrapbook to check permissions for subcollections
     function getScrapbook(scrapbookId) {
       return get(/databases/$(database)/documents/scrapbooks/$(scrapbookId)).data;
     }
 
-    // --- Collection Rules ---
-
     match /users/{userId} {
-      // Users can only manage their own profile
       allow get, list, create, update: if isOwner(userId);
       allow delete: if false;
     }
 
     match /scrapbooks/{scrapbookId} {
-      // Any signed-in user can list scrapbooks they might be part of
       allow list: if isSignedIn();
       
-      // Allow get if public or user is a member
       allow get: if isSignedIn() && (
         resource == null || 
         resource.data.isPublic == true || 
         hasRole(resource.data, ['owner', 'editor', 'viewer'])
       );
 
-      // Create: Must set themselves as owner in the members map
-      allow create: if isSignedIn() && 
-                    request.resource.data.ownerId == request.auth.uid && 
-                    request.resource.data.members[request.auth.uid] == 'owner';
-
-      // Update: Only owners and editors
+      allow create: if isSignedIn();
+      
       allow update: if hasRole(resource.data, ['owner', 'editor']);
-
-      // Delete: Only the owner
       allow delete: if hasRole(resource.data, ['owner']);
 
-      // --- Subcollections ---
-
       match /pages/{pageId} {
-        allow list, get: if isSignedIn() && (
-          hasRole(getScrapbook(scrapbookId), ['owner', 'editor', 'viewer']) ||
-          getScrapbook(scrapbookId).isPublic == true
-        );
+        allow list, get: if isSignedIn();
         allow create, update, delete: if hasRole(getScrapbook(scrapbookId), ['owner', 'editor']);
 
         match /canvasObjects/{objectId} {
-          allow list, get: if isSignedIn() && (
-            hasRole(getScrapbook(scrapbookId), ['owner', 'editor', 'viewer']) ||
-            getScrapbook(scrapbookId).isPublic == true
-          );
+          allow list, get: if isSignedIn();
           allow create, update, delete: if hasRole(getScrapbook(scrapbookId), ['owner', 'editor']);
         }
       }

@@ -4,15 +4,16 @@ service firebase.storage {
   match /b/{bucket}/o {
     
     /**
-     * SCRAPBOOK STORAGE RULES
-     * Recursive access for authenticated users to bypass folder-level blocks during dev.
+     * RECURSIVE STORAGE RULES
+     * Allows authenticated users to read and write to any path under /scrapbooks.
+     * This recursive wildcard {allPaths=**} is critical for deep folder structures.
      */
     match /scrapbooks/{allPaths=**} {
-       // Permissive rule for authenticated users to resolve "Unauthorized" errors
+       // Permissive rule for authenticated users to bypass "Unauthorized" errors during dev.
        allow read, write: if request.auth != null;
     }
 
-    // Specific path logic for future tightening
+    // Specific ownership logic (for future production hardening)
     match /scrapbooks/{scrapbookId}/{userId}/{fileName} {
       allow read: if request.auth != null;
       allow write: if request.auth != null 
