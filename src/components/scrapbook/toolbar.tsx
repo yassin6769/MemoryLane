@@ -171,11 +171,15 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     }
 
     /**
-     * ADVANCED SECURITY CHECK: Verify Auth Token before upload
-     * This prevents 'storage/unauthorized' due to expired session tokens.
+     * DEEP PATH DEBUGGING
      */
+    console.log("[Firebase Storage Debug] Auth UID:", user.uid);
+    const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
+    console.log("[Firebase Storage Debug] Target Path:", storagePath);
+
     try {
-      const idToken = await user.getIdToken(true); // Force refresh token
+      // Force refresh token to ensure session is active
+      const idToken = await user.getIdToken(true);
       if (!idToken) throw new Error("Could not verify session.");
     } catch (e) {
       console.error("[Auth Guard] Session expired or invalid:", e);
@@ -198,11 +202,6 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     setCurrentMediaType(type);
 
     try {
-      /**
-       * PATH VERIFICATION: The userId in the path MUST exactly match user.uid 
-       * to satisfy Firebase Storage Security Rules.
-       */
-      const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
       const storageRef = ref(storage, storagePath);
       const uploadTask = uploadBytesResumable(storageRef, blob);
 
@@ -214,9 +213,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         (error: StorageError) => {
           setUploadProgress(null);
           
-          /**
-           * CRITICAL LOGGING: Capture raw server response to debug 'storage/unauthorized'
-           */
+          // CRITICAL: Log the raw server response to debug "unauthorized" errors
           const customData = (error as any).customData;
           if (customData && customData.serverResponse) {
              console.error("[Firebase Storage Debug] Raw Server Response:", customData.serverResponse);
@@ -228,7 +225,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
           
           switch (error.code) {
             case 'storage/unauthorized':
-              errorMessage = "Permission denied. Check your path or ensure you are the owner.";
+              errorMessage = "Permission denied. Check your rules or folder path ownership.";
               break;
             case 'storage/canceled':
               errorMessage = "Upload was canceled.";
