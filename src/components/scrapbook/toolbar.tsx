@@ -29,6 +29,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { CollaboratorDialog } from "./collaborator-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
