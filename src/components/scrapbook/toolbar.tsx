@@ -158,7 +158,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         return;
     }
 
-    // MANDATORY: Force token refresh to prevent "Unauthorized" on stale sessions
+    // MANDATORY: Force token refresh to ensure Storage rules recognize the session
     try {
       await user.getIdToken(true);
       console.log("[Auth] Session refreshed for upload. UID:", user.uid);
@@ -188,7 +188,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         contentType: blob.type || (type === 'image' ? 'image/jpeg' : type === 'video' ? 'video/mp4' : 'audio/mpeg')
       };
 
-      // Perform upload
+      // Perform upload using uploadBytes for better compatibility in restricted environments
       const snapshot = await uploadBytes(storageRef, blob, metadata);
       const downloadUrl = await getDownloadURL(snapshot.ref);
       
@@ -216,7 +216,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       
       addDocumentNonBlocking(objectsCol, objectData);
 
-      // Auto-set cover image
+      // Auto-set cover image if none exists
       if (type === 'image' && (!scrapbook.coverImage || scrapbook.coverImage === "")) {
         const scrapbookRef = doc(db, "scrapbooks", scrapbook.id);
         updateDocumentNonBlocking(scrapbookRef, {
@@ -227,16 +227,17 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
       toast({ title: "Success", description: "Memory added to canvas." });
     } catch (error: any) {
-      // ADVANCED LOGGING: Capture raw server response for precision error fixing
+      // ADVANCED LOGGING: Capture raw server response for precision debugging
       const serverResponse = (error as any).customData?.serverResponse;
       console.error("[Storage Error] Code:", error.code);
+      console.error("[Storage Error] Message:", error.message);
       console.error("[Storage Error] Full Response:", serverResponse);
       
       let errorMessage = "An unexpected error occurred.";
       if (error.code === 'storage/unauthorized') {
-        errorMessage = "Permission Denied. Storage rules have been opened, but your session might be stale.";
+        errorMessage = "Permission Denied. Storage rules have been opened, but ensure they are deployed.";
       } else if (error.code === 'storage/unknown') {
-        errorMessage = "Connection Blocked. This is likely a CORS configuration issue. Ensure docs/cors.json is applied.";
+        errorMessage = "Connection Blocked. This is likely a CORS issue. Run the gsutil command in the docs.";
       }
 
       toast({ 
