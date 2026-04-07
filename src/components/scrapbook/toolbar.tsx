@@ -163,12 +163,15 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     setCurrentMediaType(type);
 
     try {
-      // FORCE TOKEN REFRESH to ensure session is active with new open rules
-      // This is critical for Storage uploads when rules have recently changed.
+      /**
+       * CRITICAL: Force a token refresh before upload.
+       * This ensures the SDK has a fresh, synchronized session that matches
+       * the newly deployed "Nuclear" open security rules.
+       */
       await user.getIdToken(true);
       
-      // Brief pause to allow auth state to synchronize across SDKs
-      await new Promise(resolve => setTimeout(resolve, 1000)); 
+      // Brief pause for auth state synchronization across services
+      await new Promise(resolve => setTimeout(resolve, 800)); 
 
       const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
       const storageRef = ref(storage, storagePath);
@@ -177,6 +180,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         contentType: blob.type || (type === 'image' ? 'image/jpeg' : type === 'video' ? 'video/mp4' : 'audio/mpeg'),
       };
 
+      // Perform the upload
       const snapshot = await uploadBytes(storageRef, blob, metadata);
       const downloadUrl = await getDownloadURL(snapshot.ref);
       
@@ -205,6 +209,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       
       addDocumentNonBlocking(objectsCol, objectData);
 
+      // Set cover image if not already present
       if (type === 'image' && (!scrapbook.coverImage || scrapbook.coverImage === "")) {
         const scrapbookRef = doc(db, "scrapbooks", scrapbook.id);
         updateDocumentNonBlocking(scrapbookRef, {
@@ -215,7 +220,6 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
       toast({ title: "Memory added!" });
     } catch (error: any) {
-      // Diagnostic logging for Permission Denied errors
       console.error("[Storage Error] Code:", error.code);
       console.error("[Storage Error] Details:", error);
       
