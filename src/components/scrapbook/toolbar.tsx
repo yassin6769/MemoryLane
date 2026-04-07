@@ -163,10 +163,9 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     setCurrentMediaType(type);
 
     try {
-      // FORCE TOKEN REFRESH
-      // This ensures we are using a fresh credential that matches our open rules immediately.
+      // FORCE TOKEN REFRESH to ensure session is active with new rules
       await user.getIdToken(true);
-      await new Promise(resolve => setTimeout(resolve, 500)); // Brief sync period
+      await new Promise(resolve => setTimeout(resolve, 500)); 
 
       const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
       const storageRef = ref(storage, storagePath);
@@ -213,8 +212,6 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       toast({ title: "Memory added!" });
     } catch (error: any) {
       console.error("[Storage Error] Code:", error.code);
-      console.error("[Storage Error] Details:", error);
-      
       let errorMessage = "An unexpected error occurred.";
       if (error.code === 'storage/unauthorized') {
         errorMessage = "Permission denied. Please wait a few moments for security rules to deploy and try again.";
