@@ -1,10 +1,11 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     /**
      * NUCLEAR PERMISSION FIX
      * Completely opens the database for read and write access for all users.
-     * DEPLOYMENT TRIGGER: 2025-05-25T19:00:00Z (AUDIO_FIX)
+     * DEPLOYMENT TRIGGER: 2025-05-25T20:00:00Z (VOICE_MEMO_FIX)
      */
     match /{allPaths=**} {
       allow read, write: if true;

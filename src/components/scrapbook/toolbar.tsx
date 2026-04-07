@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef } from "react";
@@ -129,7 +130,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(chunks, { type: mimeType });
-        const extension = mimeType.split('/')[1] || 'webm';
+        const extension = mimeType.split('/')[1]?.split(';')[0] || 'webm';
         await uploadMediaBlob(audioBlob, `voice_memo_${Date.now()}.${extension}`, 'audio');
         stream.getTracks().forEach(track => track.stop());
       };
@@ -138,14 +139,14 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       mediaRecorder.start();
       setIsRecording(true);
       toast({
-        title: "Recording Started",
-        description: "Speak clearly into your microphone.",
+        title: "Voice Memo Started",
+        description: "Recording your voice now...",
       });
     } catch (err) {
       toast({
         variant: "destructive",
         title: "Mic Access Denied",
-        description: "Please enable microphone permissions in your settings.",
+        description: "Please enable microphone permissions in your settings to record voice memos.",
       });
     }
   };
@@ -225,7 +226,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       toast({ 
         variant: "destructive", 
         title: "Upload Failed", 
-        description: "Permission denied or communication error. Please try again." 
+        description: "Communication error while preserving memory. Please try again." 
       });
     } finally {
       setIsUploading(false);
@@ -293,7 +294,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         <div className="w-full bg-destructive/10 border border-destructive/20 p-2 rounded-lg flex items-center justify-between animate-in fade-in slide-in-from-top-2">
             <div className="flex items-center gap-3">
                 <div className="h-3 w-3 rounded-full bg-destructive animate-pulse" />
-                <span className="text-sm font-medium text-destructive">Recording Memo...</span>
+                <span className="text-sm font-medium text-destructive">Recording Voice Memo...</span>
             </div>
             <Button variant="destructive" size="sm" onClick={stopRecording} className="h-8 gap-2">
                 <CircleStop className="h-4 w-4" />
@@ -357,7 +358,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
             <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" disabled={scrapbook?.isFinalized || isRecording || isUploading}>
                     <Mic className="mr-2 h-4 w-4" />
-                    Audio
+                    Voice Memo
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
