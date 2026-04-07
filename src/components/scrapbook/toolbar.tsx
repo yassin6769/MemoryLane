@@ -165,12 +165,17 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     try {
       // FORCE TOKEN REFRESH & SYNC
       // Critical step to ensure the SDK uses a valid credential that the open rules recognize.
+      // We also add a small delay to allow for the backend to propagate the auth state.
+      console.log("[Storage] Refreshing auth token...");
       await user.getIdToken(true);
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
       const storageRef = ref(storage, storagePath);
       
+      console.log("[Storage] Starting upload to:", storageRef.fullPath);
+      console.log("[Storage] Auth UID:", user.uid);
+
       const metadata = {
         contentType: blob.type || (type === 'image' ? 'image/jpeg' : type === 'video' ? 'video/mp4' : 'audio/mpeg'),
       };
@@ -212,6 +217,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
       toast({ title: "Memory added!" });
     } catch (error: any) {
+      // ADVANCED LOGGING: Capture raw server response for precision error fixing
       const serverResponse = (error as any).customData?.serverResponse;
       console.error("[Storage Error] Code:", error.code);
       console.error("[Storage Error] Full Response:", serverResponse);
@@ -416,7 +422,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
               Discard changes?
-            </AlertDialogTitle>
+            </AlertTriangle>
             <AlertDialogDescription>
               Your edits are automatically saved, but you haven't finalized this version yet. You can return to finish it anytime from your dashboard.
             </AlertDialogDescription>
