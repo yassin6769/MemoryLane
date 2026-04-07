@@ -56,7 +56,6 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
   const db = useFirestore();
   const storage = useStorage();
   const { user } = useUser();
-  const app = useFirebaseApp();
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isTextDialogOpen, setIsTextDialogOpen] = useState(false);
@@ -163,14 +162,8 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     setCurrentMediaType(type);
 
     try {
-      /**
-       * CRITICAL: Force a token refresh before upload.
-       * This ensures the SDK has a fresh, synchronized session that matches
-       * the newly deployed "Nuclear" open security rules.
-       */
+      // Force a token refresh to ensure synced session with Nuclear Rules
       await user.getIdToken(true);
-      
-      // Brief pause for auth state synchronization across services
       await new Promise(resolve => setTimeout(resolve, 800)); 
 
       const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
@@ -180,7 +173,6 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         contentType: blob.type || (type === 'image' ? 'image/jpeg' : type === 'video' ? 'video/mp4' : 'audio/mpeg'),
       };
 
-      // Perform the upload
       const snapshot = await uploadBytes(storageRef, blob, metadata);
       const downloadUrl = await getDownloadURL(snapshot.ref);
       
@@ -196,20 +188,20 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         x: 100,
         y: 100,
         width: type === 'audio' ? 300 : (type === 'text' ? 280 : 250),
-        height: type === 'audio' ? 120 : (type === 'text' ? 120 : 350),
+        height: type === 'audio' ? 140 : (type === 'text' ? 120 : 350),
         rotation: 0,
         scaleX: 1,
         scaleY: 1,
         zIndex: nextZIndex,
         borderWidth: 0,
         borderColor: "#000000",
+        volume: 100,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
       
       addDocumentNonBlocking(objectsCol, objectData);
 
-      // Set cover image if not already present
       if (type === 'image' && (!scrapbook.coverImage || scrapbook.coverImage === "")) {
         const scrapbookRef = doc(db, "scrapbooks", scrapbook.id);
         updateDocumentNonBlocking(scrapbookRef, {
@@ -220,20 +212,11 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
       toast({ title: "Memory added!" });
     } catch (error: any) {
-      console.error("[Storage Error] Code:", error.code);
       console.error("[Storage Error] Details:", error);
-      
-      let errorMessage = "An unexpected error occurred.";
-      if (error.code === 'storage/unauthorized') {
-        errorMessage = "Permission denied. We've re-triggered a rule sync. Please wait 60 seconds and try again.";
-      } else if (error.code === 'storage/unknown') {
-        errorMessage = "Communication error. This can happen if rules are syncing or CORS is blocked. Please try again in 30 seconds.";
-      }
-
       toast({ 
         variant: "destructive", 
         title: "Upload Failed", 
-        description: errorMessage 
+        description: "Permission denied or communication error. Re-deployment triggered, please wait 30s." 
       });
     } finally {
       setIsUploading(false);

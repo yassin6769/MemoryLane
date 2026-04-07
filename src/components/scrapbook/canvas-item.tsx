@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useRef, type MouseEvent } from "react";
+import { useState, useRef, type MouseEvent, useEffect } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { doc, getFirestore } from "firebase/firestore";
 import { ref, deleteObject } from "firebase/storage";
 import { useStorage } from "@/firebase";
-import { Trash2, FlipHorizontal, Move, Music, Play } from "lucide-react";
+import { Trash2, FlipHorizontal, Move, Music, Play, CircleStop } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import {
@@ -35,6 +35,7 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
   const [isDragging, setIsDragging] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   
   const interactionStart = useRef({ 
     clientX: 0, 
@@ -45,11 +46,18 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
   
   const hasMoved = useRef(false);
   const itemRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   
   const db = getFirestore();
   const storage = useStorage();
   const { toast } = useToast();
   const { debouncedUpdate } = useAutoSave();
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = item.volume !== undefined ? item.volume / 100 : 1.0;
+    }
+  }, [item.volume]);
 
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
@@ -118,6 +126,16 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
     debouncedUpdate(scrapbookId, pageId, item.id, {
       scaleX: (item.scaleX || 1) * -1
     });
+  };
+
+  const togglePlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
   };
 
   const handleDelete = async () => {
@@ -203,22 +221,39 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
       case "audio":
         return (
           <div 
-            className="w-full h-full flex flex-col items-center justify-center p-4 bg-primary/10 rounded-xl border-2 border-primary/20 pointer-events-none shadow-sm overflow-hidden"
+            className="w-full h-full flex flex-col items-center justify-center p-4 bg-primary/10 rounded-xl border-2 border-primary/20 shadow-sm overflow-hidden"
             style={contentStyles}
           >
-            <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center mb-2 shadow-md">
-              <div className="relative">
-                <Music className="h-4 w-4 text-white animate-bounce" />
-                <div className="absolute inset-0 h-full w-full bg-white/20 rounded-full animate-ping" />
-              </div>
-            </div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Voice Memo</p>
-            <div className="mt-2 flex gap-1 items-end h-6">
+            <audio 
+              ref={audioRef} 
+              src={item.mediaUri} 
+              onEnded={() => setIsPlaying(false)} 
+              onPause={() => setIsPlaying(false)}
+              onPlay={() => setIsPlaying(true)}
+              className="hidden"
+            />
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="action-button h-12 w-12 rounded-full bg-primary/20 text-primary hover:bg-primary/30 mb-2 relative z-10"
+              onClick={togglePlay}
+            >
+              {isPlaying ? <CircleStop className="h-6 w-6" /> : <Play className="h-6 w-6 fill-primary" />}
+            </Button>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary pointer-events-none">Voice Memo</p>
+            <div className="mt-2 flex gap-1 items-end h-6 pointer-events-none">
                {[0.6, 0.8, 0.4, 1.0, 0.5, 0.9, 0.7, 0.3, 0.6].map((h, i) => (
                  <div 
                   key={i} 
-                  className="w-1 bg-primary/40 rounded-full animate-pulse" 
-                  style={{ height: `${h * 100}%`, animationDelay: `${i * 0.1}s` }} 
+                  className={cn(
+                    "w-1 bg-primary/40 rounded-full",
+                    isPlaying && "animate-pulse"
+                  )} 
+                  style={{ 
+                    height: isPlaying ? `${h * 100}%` : '20%', 
+                    animationDelay: `${i * 0.1}s`,
+                    transition: 'height 0.2s ease'
+                  }} 
                 />
                ))}
             </div>
@@ -255,7 +290,7 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
         )}
 
         <div 
-          className="w-full h-full pointer-events-none"
+          className="w-full h-full"
           style={{
             transform: `scaleX(${(item.scaleX || 1) < 0 ? -1 : 1})`,
             transformOrigin: 'center center'

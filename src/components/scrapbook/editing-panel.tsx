@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -18,7 +17,8 @@ import {
   SendToBack,
   Square,
   Image as ImageIcon,
-  Check
+  Check,
+  Volume2
 } from "lucide-react";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import {
@@ -61,12 +61,14 @@ export function EditingPanel({
   const [rotation, setRotation] = useState(selectedItem.rotation || 0);
   const [scale, setScale] = useState(Math.abs(selectedItem.scaleX || 1));
   const [borderWidth, setBorderWidth] = useState(selectedItem.borderWidth || 0);
+  const [volume, setVolume] = useState(selectedItem.volume !== undefined ? selectedItem.volume : 100);
 
   useEffect(() => {
     setRotation(selectedItem.rotation || 0);
     setScale(Math.abs(selectedItem.scaleX || 1));
     setBorderWidth(selectedItem.borderWidth || 0);
-  }, [selectedItem.id, selectedItem.rotation, selectedItem.scaleX, selectedItem.borderWidth]);
+    setVolume(selectedItem.volume !== undefined ? selectedItem.volume : 100);
+  }, [selectedItem.id, selectedItem.rotation, selectedItem.scaleX, selectedItem.borderWidth, selectedItem.volume]);
 
   const handleRotationChange = (val: number[]) => {
     const newRotation = val[0];
@@ -92,6 +94,13 @@ export function EditingPanel({
     setBorderWidth(newWidth);
     onLiveUpdate(selectedItem.id, { borderWidth: newWidth });
     debouncedUpdate(scrapbookId, pageId, selectedItem.id, { borderWidth: newWidth });
+  };
+
+  const handleVolumeChange = (val: number[]) => {
+    const newVolume = val[0];
+    setVolume(newVolume);
+    onLiveUpdate(selectedItem.id, { volume: newVolume });
+    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { volume: newVolume });
   };
 
   const handleBorderColorChange = (color: string) => {
@@ -261,48 +270,69 @@ export function EditingPanel({
             </div>
           </div>
 
-          {/* Border Controls */}
+          {/* Border or Volume Controls */}
           <div className="space-y-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <Square className="h-4 w-4" />
-                  Border Thickness
-                </Label>
-                <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{borderWidth}px</span>
+            {selectedItem.type === 'audio' ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <Volume2 className="h-4 w-4" />
+                    Playback Volume
+                  </Label>
+                  <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{volume}%</span>
+                </div>
+                <Slider 
+                  value={[volume]} 
+                  min={0} 
+                  max={100} 
+                  step={1}
+                  onValueChange={handleVolumeChange}
+                />
               </div>
-              <Slider 
-                value={[borderWidth]} 
-                min={0} 
-                max={20} 
-                step={1}
-                onValueChange={handleBorderWidthChange}
-              />
-            </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <Square className="h-4 w-4" />
+                    Border Thickness
+                  </Label>
+                  <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{borderWidth}px</span>
+                </div>
+                <Slider 
+                  value={[borderWidth]} 
+                  min={0} 
+                  max={20} 
+                  step={1}
+                  onValueChange={handleBorderWidthChange}
+                />
+              </div>
+            )}
 
-            <div className="space-y-3">
-              <Label className="text-xs font-medium text-muted-foreground">Border Color</Label>
-              <div className="flex flex-wrap gap-2">
-                {colors.map((color) => (
-                  <TooltipProvider key={color.value}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => handleBorderColorChange(color.value)}
-                          className={cn(
-                            "h-7 w-7 rounded-full border border-muted transition-transform hover:scale-110",
-                            selectedItem.borderColor === color.value && "ring-2 ring-primary ring-offset-2"
-                          )}
-                          style={{ backgroundColor: color.value }}
-                          aria-label={`Select ${color.name}`}
-                        />
-                      </TooltipTrigger>
-                      <TooltipContent>{color.name}</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                ))}
+            {selectedItem.type !== 'audio' && (
+              <div className="space-y-3">
+                <Label className="text-xs font-medium text-muted-foreground">Border Color</Label>
+                <div className="flex flex-wrap gap-2">
+                  {colors.map((color) => (
+                    <TooltipProvider key={color.value}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => handleBorderColorChange(color.value)}
+                            className={cn(
+                              "h-7 w-7 rounded-full border border-muted transition-transform hover:scale-110",
+                              selectedItem.borderColor === color.value && "ring-2 ring-primary ring-offset-2"
+                            )}
+                            style={{ backgroundColor: color.value }}
+                            aria-label={`Select ${color.name}`}
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent>{color.name}</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
