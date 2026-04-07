@@ -227,7 +227,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       
       let errorMessage = "An unexpected error occurred.";
       if (error.code === 'storage/unauthorized') {
-        errorMessage = "Permission denied. Security rules are set to 'if true', but please allow a few moments for deployment to complete.";
+        errorMessage = "Permission denied. Security rules have been opened to 'if true', but please allow a few moments for deployment to complete.";
       } else if (error.code === 'storage/unknown') {
         errorMessage = "Network or CORS error. Check browser console for full server response.";
       }
