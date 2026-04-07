@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, type MouseEvent, useEffect } from "react";
@@ -7,7 +8,7 @@ import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { doc, getFirestore } from "firebase/firestore";
 import { ref, deleteObject } from "firebase/storage";
 import { useStorage } from "@/firebase";
-import { Trash2, FlipHorizontal, Move, Music, Play, CircleStop } from "lucide-react";
+import { Trash2, FlipHorizontal, Move, Play, CircleStop } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import {
@@ -166,6 +167,7 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
       borderColor: item.borderColor || '#000000',
       borderStyle: item.borderWidth > 0 ? 'solid' : 'none',
       padding: `${item.borderWidth || 0}px`,
+      opacity: (item.alpha !== undefined ? item.alpha : 100) / 100,
     };
 
     switch (item.type) {
@@ -187,16 +189,19 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
       case "text":
         return (
           <div 
-            className="w-full h-full p-6 flex items-center justify-center pointer-events-none bg-card/40 rounded-lg overflow-hidden backdrop-blur-[1px]"
+            className="w-full h-full p-6 flex items-center justify-center pointer-events-none bg-transparent rounded-lg overflow-hidden"
             style={contentStyles}
           >
             <p className={cn(
-              "text-center leading-relaxed text-foreground/90 whitespace-pre-wrap",
+              "text-center leading-relaxed whitespace-pre-wrap",
               item.fontFamily || "font-serif",
               item.isBold && "font-bold",
               item.isUnderline && "underline"
             )}
-            style={{ fontSize: `${item.fontSize || 22}px` }}
+            style={{ 
+              fontSize: `${item.fontSize || 22}px`,
+              color: item.textColor || "#000000"
+            }}
             >
               {item.text}
             </p>
@@ -213,9 +218,6 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
               className="w-full h-full object-cover"
               muted autoPlay loop playsInline
             />
-            <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover/video:opacity-100 transition-opacity">
-              <Play className="h-10 w-10 text-white/50 fill-white/20" />
-            </div>
           </div>
         );
       case "audio":
@@ -241,22 +243,6 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
               {isPlaying ? <CircleStop className="h-6 w-6" /> : <Play className="h-6 w-6 fill-primary" />}
             </Button>
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary pointer-events-none">Voice Memo</p>
-            <div className="mt-2 flex gap-1 items-end h-6 pointer-events-none">
-               {[0.6, 0.8, 0.4, 1.0, 0.5, 0.9, 0.7, 0.3, 0.6].map((h, i) => (
-                 <div 
-                  key={i} 
-                  className={cn(
-                    "w-1 bg-primary/40 rounded-full",
-                    isPlaying && "animate-pulse"
-                  )} 
-                  style={{ 
-                    height: isPlaying ? `${h * 100}%` : '20%', 
-                    animationDelay: `${i * 0.1}s`,
-                    transition: 'height 0.2s ease'
-                  }} 
-                />
-               ))}
-            </div>
           </div>
         );
       default:
@@ -320,9 +306,6 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
             </Button>
 
             <div className="absolute inset-0 border-2 border-dashed border-primary/40 rounded-sm pointer-events-none" />
-            <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
-              <Move className="h-10 w-10 text-primary" />
-            </div>
           </>
         )}
       </div>

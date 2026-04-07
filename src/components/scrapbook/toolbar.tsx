@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef } from "react";
@@ -15,6 +16,7 @@ import {
   CircleStop,
   Radio,
   FileAudio,
+  Palette,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -42,15 +44,17 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
 interface ToolbarProps {
   scrapbook: any;
   pageId?: string;
   items?: any[]; 
+  currentPageData?: any;
 }
 
-export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
+export function Toolbar({ scrapbook, pageId, items = [], currentPageData }: ToolbarProps) {
   const router = useRouter();
   const { toast } = useToast();
   const db = useFirestore();
@@ -68,6 +72,16 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [recorder, setRecorder] = useState<MediaRecorder | null>(null);
 
+  const canvasColors = [
+    { name: "Classic White", value: "#ffffff" },
+    { name: "Creamy Paper", value: "#fdf6e3" },
+    { name: "Soft Grey", value: "#f8fafc" },
+    { name: "Midnight", value: "#1e293b" },
+    { name: "Vintage Sepia", value: "#faf3e0" },
+    { name: "Pale Pink", value: "#fff1f2" },
+    { name: "Sky Mist", value: "#f0f9ff" },
+  ];
+
   const handleBackNavigation = () => {
     if (scrapbook?.isFinalized) {
       router.push("/dashboard");
@@ -76,197 +90,79 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     }
   };
 
-  const confirmBack = () => {
-    setIsBackDialogOpen(false);
-    router.push("/dashboard");
-  };
-
   const handleFinalize = () => {
     if (!scrapbook?.id) return;
     setIsFinalizing(true);
-    
     const scrapbookRef = doc(db, "scrapbooks", scrapbook.id);
-    
-    updateDocumentNonBlocking(scrapbookRef, { 
-      isFinalized: true,
-      updatedAt: serverTimestamp()
-    });
-    
+    updateDocumentNonBlocking(scrapbookRef, { isFinalized: true, updatedAt: serverTimestamp() });
     setTimeout(() => {
       setIsFinalizing(false);
-      toast({
-        title: "Design Finalized",
-        description: "Your scrapbook design has been locked.",
-      });
+      toast({ title: "Design Finalized" });
       router.push("/dashboard");
     }, 800);
   };
 
-  const handleMediaClick = (type: 'image' | 'video' | 'audio') => {
-    setCurrentMediaType(type);
-    setTimeout(() => {
-        fileInputRef.current?.click();
-    }, 50);
-  };
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm') 
-        ? 'audio/webm' 
-        : MediaRecorder.isTypeSupported('audio/ogg')
-        ? 'audio/ogg'
-        : 'audio/mp4';
-
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
-      const chunks: Blob[] = [];
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data);
-      };
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(chunks, { type: mimeType });
-        const extension = mimeType.split('/')[1]?.split(';')[0] || 'webm';
-        await uploadMediaBlob(audioBlob, `voice_memo_${Date.now()}.${extension}`, 'audio');
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      setRecorder(mediaRecorder);
-      mediaRecorder.start();
-      setIsRecording(true);
-      toast({
-        title: "Voice Memo Started",
-        description: "Recording your voice now...",
-      });
-    } catch (err) {
-      toast({
-        variant: "destructive",
-        title: "Mic Access Denied",
-        description: "Please enable microphone permissions in your settings to record voice memos.",
-      });
-    }
-  };
-
-  const stopRecording = () => {
-    if (recorder && isRecording) {
-      recorder.stop();
-      setIsRecording(false);
-    }
+  const updatePageColor = (color: string) => {
+    if (!pageId) return;
+    const pageRef = doc(db, "scrapbooks", scrapbook.id, "pages", pageId);
+    updateDocumentNonBlocking(pageRef, { backgroundColor: color, updatedAt: serverTimestamp() });
+    toast({ title: "Canvas Color Updated" });
   };
 
   const uploadMediaBlob = async (blob: Blob | File, fileName: string, type: 'image' | 'video' | 'audio') => {
-    if (!storage || !user || !pageId) {
-        toast({ 
-            variant: "destructive", 
-            title: "Session Error", 
-            description: "Missing required services. Please refresh." 
-        });
-        return;
-    }
-
+    if (!storage || !user || !pageId) return;
     setIsUploading(true);
-    setCurrentMediaType(type);
-
     try {
-      // Force token refresh to sync session
       await user.getIdToken(true);
-      
       const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
       const storageRef = ref(storage, storagePath);
-      
-      const metadata = {
-        contentType: blob.type || (type === 'image' ? 'image/jpeg' : type === 'video' ? 'video/mp4' : 'audio/mpeg'),
-      };
-
-      const snapshot = await uploadBytes(storageRef, blob, metadata);
+      const snapshot = await uploadBytes(storageRef, blob);
       const downloadUrl = await getDownloadURL(snapshot.ref);
-      
       const objectsCol = collection(db, "scrapbooks", scrapbook.id, "pages", pageId, "canvasObjects");
       const nextZIndex = items.length > 0 ? Math.max(...items.map((i: any) => i.zIndex || 0)) + 1 : 1;
 
-      const objectData = {
-        pageId,
-        id: "obj_" + Date.now(),
-        type: type,
-        mediaUri: downloadUrl,
-        members: scrapbook.members || { [user.uid]: 'owner' },
-        x: 100,
-        y: 100,
-        width: type === 'audio' ? 300 : (type === 'text' ? 280 : 250),
-        height: type === 'audio' ? 140 : (type === 'text' ? 120 : 350),
-        rotation: 0,
-        scaleX: 1,
-        scaleY: 1,
-        zIndex: nextZIndex,
-        borderWidth: 0,
-        borderColor: "#000000",
-        volume: 100,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-      
-      addDocumentNonBlocking(objectsCol, objectData);
-
-      if (type === 'image' && (!scrapbook.coverImage || scrapbook.coverImage === "")) {
-        const scrapbookRef = doc(db, "scrapbooks", scrapbook.id);
-        updateDocumentNonBlocking(scrapbookRef, {
-          coverImage: downloadUrl,
-          updatedAt: serverTimestamp()
-        });
-      }
-
-      toast({ title: "Memory added!" });
-    } catch (error: any) {
-      console.error("[Storage Error] Details:", error);
-      toast({ 
-        variant: "destructive", 
-        title: "Upload Failed", 
-        description: "Could not upload media. Please try again." 
+      addDocumentNonBlocking(objectsCol, {
+        pageId, id: "obj_" + Date.now(), type, mediaUri: downloadUrl,
+        members: scrapbook.members, x: 100, y: 100, width: 250, height: 350,
+        rotation: 0, scaleX: 1, scaleY: 1, zIndex: nextZIndex, createdAt: serverTimestamp(),
       });
+      toast({ title: "Memory added!" });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Upload Failed" });
     } finally {
       setIsUploading(false);
     }
   };
 
-  const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !currentMediaType) return;
-    await uploadMediaBlob(file, file.name, currentMediaType);
-    e.target.value = ''; 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e) => chunks.push(e.data);
+      recorder.onstop = () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+        uploadMediaBlob(audioBlob, `voice_memo_${Date.now()}.webm`, 'audio');
+        stream.getTracks().forEach(t => t.stop());
+      };
+      setRecorder(recorder);
+      recorder.start();
+      setIsRecording(true);
+      toast({ title: "Recording Voice Memo" });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Mic Access Denied" });
+    }
   };
 
   const saveText = () => {
     if (!textInput.trim() || !pageId || !user) return;
-
     const objectsCol = collection(db, "scrapbooks", scrapbook.id, "pages", pageId, "canvasObjects");
-    const nextZIndex = items.length > 0 ? Math.max(...items.map((i: any) => i.zIndex || 0)) + 1 : 1;
-
     addDocumentNonBlocking(objectsCol, {
-      pageId,
-      id: "text_" + Date.now(),
-      type: "text",
-      text: textInput,
-      isBold: false,
-      isUnderline: false,
-      fontSize: 24,
-      fontFamily: "font-serif",
-      borderWidth: 0,
-      borderColor: "#000000",
-      members: scrapbook.members || { [user.uid]: 'owner' },
-      x: 150,
-      y: 150,
-      width: 280,
-      height: 120,
-      rotation: 0,
-      scaleX: 1,
-      scaleY: 1,
-      zIndex: nextZIndex,
+      pageId, type: "text", text: textInput, textColor: "#000000", alpha: 100,
+      id: "text_" + Date.now(), fontSize: 24, fontFamily: "font-serif",
+      members: scrapbook.members, x: 150, y: 150, width: 280, height: 120, zIndex: 99,
       createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
     });
-
     setTextInput("");
     setIsTextDialogOpen(false);
     toast({ title: "Text added!" });
@@ -274,159 +170,67 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      {isUploading && (
-        <div className="w-full space-y-2 px-1">
-          <div className="flex justify-between text-xs font-medium">
-            <span className="animate-pulse flex items-center gap-2 text-primary">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Uploading {currentMediaType}...
-            </span>
-            <span className="text-muted-foreground italic">Preserving memory...</span>
-          </div>
-          <Progress value={undefined} className="h-2" />
-        </div>
-      )}
-
-      {isRecording && (
-        <div className="w-full bg-destructive/10 border border-destructive/20 p-2 rounded-lg flex items-center justify-between animate-in fade-in slide-in-from-top-2">
-            <div className="flex items-center gap-3">
-                <div className="h-3 w-3 rounded-full bg-destructive animate-pulse" />
-                <span className="text-sm font-medium text-destructive">Recording Voice Memo...</span>
-            </div>
-            <Button variant="destructive" size="sm" onClick={stopRecording} className="h-8 gap-2">
-                <CircleStop className="h-4 w-4" />
-                Stop & Save
-            </Button>
-        </div>
-      )}
-
+      {isUploading && <Progress value={undefined} className="h-1" />}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={handleBackNavigation}
-            className="rounded-full h-10 w-10 hover:bg-muted/50 transition-colors"
-          >
-            <ChevronLeft className="h-6 w-6" />
-          </Button>
-          
+          <Button variant="ghost" size="icon" onClick={handleBackNavigation} className="rounded-full"><ChevronLeft className="h-6 w-6" /></Button>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold font-headline">{scrapbook?.title}</h1>
-              {scrapbook?.isFinalized && <CheckCircle2 className="h-5 w-5 text-green-500" />}
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">{scrapbook?.category}</Badge>
-              {scrapbook?.isPublic ? <Badge variant="secondary">Public</Badge> : <Badge variant="secondary">Private</Badge>}
-            </div>
+            <h1 className="text-2xl font-bold font-headline">{scrapbook?.title}</h1>
+            <Badge variant="outline">{scrapbook?.category}</Badge>
           </div>
         </div>
         
         <div className="flex items-center gap-2">
-          <input
-            type="file"
-            ref={fileInputRef}
-            className="hidden"
-            accept={
-                currentMediaType === 'image' 
-                ? 'image/*' 
-                : currentMediaType === 'video' 
-                ? 'video/*' 
-                : 'audio/*'
-            }
-            onChange={onFileChange}
-          />
-          
-          <Button variant="outline" size="sm" onClick={() => handleMediaClick('image')} disabled={scrapbook?.isFinalized || isRecording || isUploading}>
-            <ImagePlus className="mr-2 h-4 w-4" />
-            Photo
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setIsTextDialogOpen(true)} disabled={scrapbook?.isFinalized || isRecording || isUploading}>
-            <Type className="mr-2 h-4 w-4" />
-            Text
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => handleMediaClick('video')} disabled={scrapbook?.isFinalized || isRecording || isUploading}>
-            <Video className="mr-2 h-4 w-4" />
-            Video
-          </Button>
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" disabled={scrapbook?.isFinalized || isRecording || isUploading}>
-                    <Mic className="mr-2 h-4 w-4" />
-                    Voice Memo
-                </Button>
+              <Button variant="outline" size="sm"><Palette className="mr-2 h-4 w-4" /> Canvas Color</Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={startRecording} className="gap-2">
-                    <Radio className="h-4 w-4 text-destructive" />
-                    Record New Memo
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleMediaClick('audio')} className="gap-2">
-                    <FileAudio className="h-4 w-4" />
-                    Upload Audio File
-                </DropdownMenuItem>
+            <DropdownMenuContent align="end" className="w-48 p-2">
+              <div className="grid grid-cols-4 gap-2">
+                {canvasColors.map((color) => (
+                  <button
+                    key={color.value}
+                    onClick={() => updatePageColor(color.value)}
+                    className={cn(
+                      "h-8 w-8 rounded-full border border-muted transition-transform hover:scale-110",
+                      currentPageData?.backgroundColor === color.value && "ring-2 ring-primary ring-offset-1"
+                    )}
+                    style={{ backgroundColor: color.value }}
+                    title={color.name}
+                  />
+                ))}
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <Button variant="outline" size="sm" onClick={() => { setCurrentMediaType('image'); setTimeout(() => fileInputRef.current?.click(), 0); }}><ImagePlus className="mr-2 h-4 w-4" /> Photo</Button>
+          <Button variant="outline" size="sm" onClick={() => setIsTextDialogOpen(true)}><Type className="mr-2 h-4 w-4" /> Text</Button>
           
-          <div className="h-6 border-l mx-2 hidden sm:block" />
-          
-          <Button variant="outline" size="sm" onClick={() => setIsShareOpen(true)}>
-            <Share2 className="mr-2 h-4 w-4" />
-            Share
-          </Button>
-          
-          <Button size="sm" onClick={handleFinalize} disabled={isFinalizing || scrapbook?.isFinalized || isRecording || isUploading}>
-            {isFinalizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-            {scrapbook?.isFinalized ? "Finalized" : "Finalize"}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Mic className="mr-2 h-4 w-4" /> Voice Memo</Button></DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={isRecording ? () => { recorder?.stop(); setIsRecording(false); } : startRecording}>
+                {isRecording ? <CircleStop className="mr-2 h-4 w-4 text-destructive" /> : <Radio className="mr-2 h-4 w-4" />}
+                {isRecording ? "Stop Recording" : "Record Voice"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button variant="outline" size="sm" onClick={() => setIsShareOpen(true)}><Share2 className="mr-2 h-4 w-4" /> Share</Button>
+          <Button size="sm" onClick={handleFinalize} disabled={isFinalizing}>{isFinalizing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Finalize"}</Button>
         </div>
       </div>
-
-      <CollaboratorDialog 
-        scrapbook={scrapbook} 
-        open={isShareOpen} 
-        onOpenChange={setIsShareOpen} 
-      />
-
+      <input type="file" ref={fileInputRef} className="hidden" accept="image/*,video/*,audio/*" onChange={(e) => { const f = e.target.files?.[0]; if (f && currentMediaType) uploadMediaBlob(f, f.name, currentMediaType); e.target.value = ''; }} />
+      <CollaboratorDialog scrapbook={scrapbook} open={isShareOpen} onOpenChange={setIsShareOpen} />
       <Dialog open={isTextDialogOpen} onOpenChange={setIsTextDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Story Text</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <Input 
-              placeholder="What's the story behind this moment?" 
-              value={textInput}
-              onChange={(e) => setTextInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && saveText()}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsTextDialogOpen(false)}>Cancel</Button>
-            <Button onClick={saveText}>Add to Page</Button>
-          </DialogFooter>
+        <DialogContent><DialogHeader><DialogTitle>Add Story Text</DialogTitle></DialogHeader>
+          <div className="py-4"><Input placeholder="The story behind this moment..." value={textInput} onChange={(e) => setTextInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveText()} /></div>
+          <DialogFooter><Button onClick={saveText}>Add to Page</Button></DialogFooter>
         </DialogContent>
       </Dialog>
-
       <AlertDialog open={isBackDialogOpen} onOpenChange={setIsBackDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              Discard changes?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Your edits are automatically saved, but you haven't finalized this version yet. You can return to finish it anytime from your dashboard.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Continue Editing</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmBack} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Exit
-            </AlertDialogAction>
-          </AlertDialogFooter>
+        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Exit Editor?</AlertDialogTitle><AlertDialogDescription>Your changes are saved automatically.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Continue Editing</AlertDialogCancel><AlertDialogAction onClick={() => router.push("/dashboard")} className="bg-destructive">Exit</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

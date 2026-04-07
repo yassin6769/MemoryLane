@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -18,7 +19,9 @@ import {
   Square,
   Image as ImageIcon,
   Check,
-  Volume2
+  Volume2,
+  Palette,
+  Layers
 } from "lucide-react";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import {
@@ -57,18 +60,19 @@ export function EditingPanel({
   const { toast } = useToast();
   const db = getFirestore();
   
-  // Local state for sliders to allow smooth dragging before Firestore update
   const [rotation, setRotation] = useState(selectedItem.rotation || 0);
   const [scale, setScale] = useState(Math.abs(selectedItem.scaleX || 1));
   const [borderWidth, setBorderWidth] = useState(selectedItem.borderWidth || 0);
   const [volume, setVolume] = useState(selectedItem.volume !== undefined ? selectedItem.volume : 100);
+  const [alpha, setAlpha] = useState(selectedItem.alpha !== undefined ? selectedItem.alpha : 100);
 
   useEffect(() => {
     setRotation(selectedItem.rotation || 0);
     setScale(Math.abs(selectedItem.scaleX || 1));
     setBorderWidth(selectedItem.borderWidth || 0);
     setVolume(selectedItem.volume !== undefined ? selectedItem.volume : 100);
-  }, [selectedItem.id, selectedItem.rotation, selectedItem.scaleX, selectedItem.borderWidth, selectedItem.volume]);
+    setAlpha(selectedItem.alpha !== undefined ? selectedItem.alpha : 100);
+  }, [selectedItem.id, selectedItem.rotation, selectedItem.scaleX, selectedItem.borderWidth, selectedItem.volume, selectedItem.alpha]);
 
   const handleRotationChange = (val: number[]) => {
     const newRotation = val[0];
@@ -80,32 +84,21 @@ export function EditingPanel({
   const handleScaleChange = (val: number[]) => {
     const newScale = val[0];
     setScale(newScale);
-    const isFlipped = (selectedItem.scaleX || 1) < 0;
-    const updates = { 
-      scaleX: newScale * (isFlipped ? -1 : 1),
-      scaleY: newScale
-    };
+    const updates = { scaleX: newScale * ((selectedItem.scaleX || 1) < 0 ? -1 : 1), scaleY: newScale };
     onLiveUpdate(selectedItem.id, updates);
     debouncedUpdate(scrapbookId, pageId, selectedItem.id, updates);
   };
 
-  const handleBorderWidthChange = (val: number[]) => {
-    const newWidth = val[0];
-    setBorderWidth(newWidth);
-    onLiveUpdate(selectedItem.id, { borderWidth: newWidth });
-    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { borderWidth: newWidth });
+  const handleAlphaChange = (val: number[]) => {
+    const newAlpha = val[0];
+    setAlpha(newAlpha);
+    onLiveUpdate(selectedItem.id, { alpha: newAlpha });
+    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { alpha: newAlpha });
   };
 
-  const handleVolumeChange = (val: number[]) => {
-    const newVolume = val[0];
-    setVolume(newVolume);
-    onLiveUpdate(selectedItem.id, { volume: newVolume });
-    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { volume: newVolume });
-  };
-
-  const handleBorderColorChange = (color: string) => {
-    onLiveUpdate(selectedItem.id, { borderColor: color });
-    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { borderColor: color });
+  const handleTextColorChange = (color: string) => {
+    onLiveUpdate(selectedItem.id, { textColor: color });
+    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { textColor: color });
   };
 
   const bringToFront = () => {
@@ -131,261 +124,82 @@ export function EditingPanel({
       coverImage: selectedItem.mediaUri,
       updatedAt: serverTimestamp()
     });
-    toast({
-      title: "Cover Updated!",
-      description: "This item is now the cover of your scrapbook.",
-    });
-  };
-
-  const toggleBold = () => {
-    const newBold = !selectedItem.isBold;
-    onLiveUpdate(selectedItem.id, { isBold: newBold });
-    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { isBold: newBold });
-  };
-
-  const toggleUnderline = () => {
-    const newUnderline = !selectedItem.isUnderline;
-    onLiveUpdate(selectedItem.id, { isUnderline: newUnderline });
-    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { isUnderline: newUnderline });
-  };
-
-  const adjustFontSize = (delta: number) => {
-    const newSize = Math.max(8, (selectedItem.fontSize || 24) + delta);
-    onLiveUpdate(selectedItem.id, { fontSize: newSize });
-    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { fontSize: newSize });
-  };
-
-  const handleFontFamilyChange = (font: string) => {
-    onLiveUpdate(selectedItem.id, { fontFamily: font });
-    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { fontFamily: font });
+    toast({ title: "Cover Updated!" });
   };
 
   const colors = [
-    { name: "White", value: "#FFFFFF" },
     { name: "Black", value: "#000000" },
-    { name: "Primary", value: "hsl(35, 83%, 71%)" },
-    { name: "Red", value: "#ef4444" },
-    { name: "Blue", value: "#3b82f6" },
-    { name: "Green", value: "#22c55e" },
+    { name: "White", value: "#FFFFFF" },
+    { name: "Primary", value: "#f1b36a" },
+    { name: "Soft Blue", value: "#93c5fd" },
+    { name: "Sage", value: "#a7f3d0" },
+    { name: "Rose", value: "#fda4af" },
+    { name: "Slate", value: "#475569" },
   ];
-
-  const isCurrentCover = selectedItem.mediaUri && selectedItem.mediaUri === currentCoverImage;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t shadow-2xl animate-in slide-in-from-bottom duration-300 pb-safe sm:left-14">
       <div className="container mx-auto p-4 flex flex-col gap-6 max-w-4xl">
         <div className="flex items-center justify-between border-b pb-2">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center text-primary">
-              {selectedItem.type === 'text' ? <Type className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-            </div>
-            <h3 className="font-headline font-bold text-lg capitalize">Edit {selectedItem.type}</h3>
+            <h3 className="font-headline font-bold text-lg capitalize">Editing {selectedItem.type}</h3>
           </div>
           
           <div className="flex items-center gap-2">
             {(selectedItem.type === 'image' || selectedItem.type === 'video') && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button 
-                      variant={isCurrentCover ? "default" : "outline"} 
-                      size="sm" 
-                      onClick={handleSetAsCover}
-                      className={cn("h-9 gap-2", isCurrentCover && "bg-primary text-primary-foreground")}
-                    >
-                      {isCurrentCover ? <Check className="h-4 w-4" /> : <ImageIcon className="h-4 w-4" />}
-                      {isCurrentCover ? "Active Cover" : "Set as Cover"}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Use as Scrapbook Cover</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Button 
+                variant={selectedItem.mediaUri === currentCoverImage ? "default" : "outline"} 
+                size="sm" 
+                onClick={handleSetAsCover}
+                className="h-9 gap-2"
+              >
+                <ImageIcon className="h-4 w-4" />
+                Set Cover
+              </Button>
             )}
-
-            <div className="h-6 border-l mx-2" />
-
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" onClick={bringToFront} className="h-9 w-9">
-                    <BringToFront className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Bring to Front</TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" onClick={sendToBack} className="h-9 w-9">
-                    <SendToBack className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Send to Back</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            <div className="h-6 border-l mx-2" />
-
-            <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full h-9 w-9">
-              <X className="h-5 w-5" />
-            </Button>
+            <Button variant="outline" size="icon" onClick={bringToFront}><BringToFront className="h-4 w-4" /></Button>
+            <Button variant="outline" size="icon" onClick={sendToBack}><SendToBack className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Transformation Controls */}
           <div className="space-y-6">
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <RotateCcw className="h-4 w-4" />
-                  Rotation
-                </Label>
-                <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{rotation}°</span>
-              </div>
-              <Slider 
-                value={[rotation]} 
-                min={0} 
-                max={360} 
-                step={1}
-                onValueChange={handleRotationChange}
-              />
+              <Label className="flex items-center gap-2 text-sm font-medium"><RotateCcw className="h-4 w-4" /> Rotation ({rotation}°)</Label>
+              <Slider value={[rotation]} min={0} max={360} onValueChange={handleRotationChange} />
             </div>
-
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <Maximize2 className="h-4 w-4" />
-                  Size
-                </Label>
-                <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{scale.toFixed(1)}x</span>
-              </div>
-              <Slider 
-                value={[scale]} 
-                min={0.5} 
-                max={3.0} 
-                step={0.1}
-                onValueChange={handleScaleChange}
-              />
+              <Label className="flex items-center gap-2 text-sm font-medium"><Maximize2 className="h-4 w-4" /> Size ({scale.toFixed(1)}x)</Label>
+              <Slider value={[scale]} min={0.5} max={3.0} step={0.1} onValueChange={handleScaleChange} />
             </div>
           </div>
 
-          {/* Border or Volume Controls */}
           <div className="space-y-6">
-            {selectedItem.type === 'audio' ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                    <Volume2 className="h-4 w-4" />
-                    Playback Volume
-                  </Label>
-                  <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{volume}%</span>
-                </div>
-                <Slider 
-                  value={[volume]} 
-                  min={0} 
-                  max={100} 
-                  step={1}
-                  onValueChange={handleVolumeChange}
-                />
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                    <Square className="h-4 w-4" />
-                    Border Thickness
-                  </Label>
-                  <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{borderWidth}px</span>
-                </div>
-                <Slider 
-                  value={[borderWidth]} 
-                  min={0} 
-                  max={20} 
-                  step={1}
-                  onValueChange={handleBorderWidthChange}
-                />
-              </div>
-            )}
-
-            {selectedItem.type !== 'audio' && (
+            <div className="space-y-4">
+              <Label className="flex items-center gap-2 text-sm font-medium"><Layers className="h-4 w-4" /> Transparency ({alpha}%)</Label>
+              <Slider value={[alpha]} min={0} max={100} onValueChange={handleAlphaChange} />
+            </div>
+            {selectedItem.type === 'text' && (
               <div className="space-y-3">
-                <Label className="text-xs font-medium text-muted-foreground">Border Color</Label>
+                <Label className="flex items-center gap-2 text-sm font-medium"><Palette className="h-4 w-4" /> Text Color</Label>
                 <div className="flex flex-wrap gap-2">
                   {colors.map((color) => (
-                    <TooltipProvider key={color.value}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            onClick={() => handleBorderColorChange(color.value)}
-                            className={cn(
-                              "h-7 w-7 rounded-full border border-muted transition-transform hover:scale-110",
-                              selectedItem.borderColor === color.value && "ring-2 ring-primary ring-offset-2"
-                            )}
-                            style={{ backgroundColor: color.value }}
-                            aria-label={`Select ${color.name}`}
-                          />
-                        </TooltipTrigger>
-                        <TooltipContent>{color.name}</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <button
+                      key={color.value}
+                      onClick={() => handleTextColorChange(color.value)}
+                      className={cn(
+                        "h-7 w-7 rounded-full border border-muted transition-transform hover:scale-110",
+                        selectedItem.textColor === color.value && "ring-2 ring-primary ring-offset-2"
+                      )}
+                      style={{ backgroundColor: color.value }}
+                    />
                   ))}
                 </div>
               </div>
             )}
           </div>
         </div>
-
-        {/* Text Specific Controls */}
-        {selectedItem.type === 'text' && (
-          <div className="flex flex-wrap items-center gap-6 pt-2 border-t mt-2">
-            <div className="flex items-center gap-2">
-               <Label className="text-xs font-medium text-muted-foreground">Font</Label>
-               <Select value={selectedItem.fontFamily || "font-serif"} onValueChange={handleFontFamilyChange}>
-                <SelectTrigger className="h-9 w-[130px] rounded-full">
-                  <SelectValue placeholder="Font" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="font-serif">Elegant Serif</SelectItem>
-                  <SelectItem value="font-sans">Modern Sans</SelectItem>
-                  <SelectItem value="font-mono">Clean Mono</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Label className="text-xs font-medium text-muted-foreground">Size</Label>
-              <div className="flex items-center gap-1 bg-muted/50 rounded-full p-1">
-                <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={() => adjustFontSize(-2)}>
-                  <Minus className="h-3 w-3" />
-                </Button>
-                <span className="text-xs font-bold w-6 text-center">{selectedItem.fontSize || 24}</span>
-                <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={() => adjustFontSize(2)}>
-                  <Plus className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1 bg-muted/50 rounded-full p-1 ml-auto">
-              <Button 
-                size="icon" 
-                variant={selectedItem.isBold ? "default" : "ghost"} 
-                className="h-8 w-8 rounded-full"
-                onClick={toggleBold}
-              >
-                <Bold className="h-4 w-4" />
-              </Button>
-              <Button 
-                size="icon" 
-                variant={selectedItem.isUnderline ? "default" : "ghost"} 
-                className="h-8 w-8 rounded-full"
-                onClick={toggleUnderline}
-              >
-                <Underline className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
