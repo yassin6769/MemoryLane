@@ -15,7 +15,6 @@ import {
   CircleStop,
   Radio,
   FileAudio,
-  Play
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -24,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useUser, useStorage } from "@/firebase";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { collection, doc, serverTimestamp } from "firebase/firestore";
-import { ref, uploadBytesResumable, getDownloadURL, StorageError } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { CollaboratorDialog } from "./collaborator-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -64,7 +63,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
   const [textInput, setTextInput] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentMediaType, setCurrentMediaType] = useState<'image' | 'video' | 'audio' | null>(null);
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const [isRecording, setIsRecording] = useState(false);
   const [recorder, setRecorder] = useState<MediaRecorder | null>(null);
@@ -180,7 +179,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       return;
     }
     
-    setUploadProgress(0);
+    setIsUploading(true);
     setCurrentMediaType(type);
 
     try {
@@ -189,77 +188,62 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         contentType: blob.type || (type === 'image' ? 'image/jpeg' : type === 'video' ? 'video/mp4' : 'audio/mpeg')
       };
 
-      const uploadTask = uploadBytesResumable(storageRef, blob, metadata);
+      // Using uploadBytes instead of uploadBytesResumable for simpler single-request flow
+      const snapshot = await uploadBytes(storageRef, blob, metadata);
+      const downloadUrl = await getDownloadURL(snapshot.ref);
+      
+      const objectsCol = collection(db, "scrapbooks", scrapbook.id, "pages", pageId, "canvasObjects");
+      const nextZIndex = items.length > 0 ? Math.max(...items.map((i: any) => i.zIndex || 0)) + 1 : 1;
 
-      uploadTask.on('state_changed', 
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress(progress);
-        }, 
-        (error: StorageError) => {
-          setUploadProgress(null);
-          
-          // ADVANCED LOGGING: Capture raw server response for precision debugging
-          const serverResponse = (error as any).customData?.serverResponse;
-          console.error("[Storage Error] Code:", error.code);
-          console.error("[Storage Error] Full Response:", serverResponse);
-          
-          let errorMessage = "An unexpected error occurred.";
-          if (error.code === 'storage/unauthorized') {
-            errorMessage = "Permission Denied. Storage rules have been opened, but the session might be stale.";
-          } else if (error.code === 'storage/unknown') {
-            errorMessage = "Unknown error. This usually indicates a CORS policy mismatch or network interruption.";
-          }
+      const objectData = {
+        pageId,
+        type: type,
+        mediaUri: downloadUrl,
+        members: scrapbook.members,
+        x: 100,
+        y: 100,
+        width: type === 'audio' ? 300 : (type === 'text' ? 280 : 250),
+        height: type === 'audio' ? 120 : (type === 'text' ? 120 : 350),
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        zIndex: nextZIndex,
+        borderWidth: 0,
+        borderColor: "#000000",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      
+      addDocumentNonBlocking(objectsCol, objectData);
 
-          toast({ 
-            variant: "destructive", 
-            title: "Upload Failed", 
-            description: errorMessage 
-          });
-        }, 
-        async () => {
-          const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-          const objectsCol = collection(db, "scrapbooks", scrapbook.id, "pages", pageId, "canvasObjects");
-          const nextZIndex = items.length > 0 ? Math.max(...items.map((i: any) => i.zIndex || 0)) + 1 : 1;
+      // Auto-set cover image if none exists
+      if (type === 'image' && (!scrapbook.coverImage || scrapbook.coverImage === "")) {
+        const scrapbookRef = doc(db, "scrapbooks", scrapbook.id);
+        updateDocumentNonBlocking(scrapbookRef, {
+          coverImage: downloadUrl,
+          updatedAt: serverTimestamp()
+        });
+      }
 
-          const objectData = {
-            pageId,
-            type: type,
-            mediaUri: downloadUrl,
-            members: scrapbook.members,
-            x: 100,
-            y: 100,
-            width: type === 'audio' ? 300 : (type === 'text' ? 280 : 250),
-            height: type === 'audio' ? 120 : (type === 'text' ? 120 : 350),
-            rotation: 0,
-            scaleX: 1,
-            scaleY: 1,
-            zIndex: nextZIndex,
-            borderWidth: 0,
-            borderColor: "#000000",
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          };
-          
-          addDocumentNonBlocking(objectsCol, objectData);
+      toast({ title: "Success", description: `${type} added to your canvas.` });
+    } catch (error: any) {
+      console.error("[Storage Error] Code:", error.code);
+      console.error("[Storage Error] Full Details:", error);
+      
+      let errorMessage = "An unexpected error occurred.";
+      if (error.code === 'storage/unauthorized') {
+        errorMessage = "Permission Denied. Storage rules have been opened, but the session might be stale.";
+      } else if (error.code === 'storage/unknown') {
+        errorMessage = "Unknown error. This usually indicates a CORS policy mismatch or network interruption. Ensure docs/cors.json is applied.";
+      }
 
-          // Auto-set cover image if none exists
-          if (type === 'image' && (!scrapbook.coverImage || scrapbook.coverImage === "")) {
-            const scrapbookRef = doc(db, "scrapbooks", scrapbook.id);
-            updateDocumentNonBlocking(scrapbookRef, {
-              coverImage: downloadUrl,
-              updatedAt: serverTimestamp()
-            });
-          }
-
-          setUploadProgress(null);
-          toast({ title: "Success", description: `${type} added to your canvas.` });
-        }
-      );
-    } catch (err: any) {
-      setUploadProgress(null);
-      console.error("[Storage Catch] Initialization error:", err);
-      toast({ variant: "destructive", title: "Process Failed", description: err.message });
+      toast({ 
+        variant: "destructive", 
+        title: "Upload Failed", 
+        description: errorMessage 
+      });
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -306,16 +290,16 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      {uploadProgress !== null && (
+      {isUploading && (
         <div className="w-full space-y-2 px-1">
           <div className="flex justify-between text-xs font-medium">
             <span className="animate-pulse flex items-center gap-2">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                Processing {currentMediaType}...
+                Uploading {currentMediaType}...
             </span>
-            <span>{Math.round(uploadProgress)}%</span>
+            <span className="text-muted-foreground italic">Sending memory to cloud...</span>
           </div>
-          <Progress value={uploadProgress} className="h-2" />
+          <Progress value={undefined} className="h-2" />
         </div>
       )}
 
@@ -370,22 +354,22 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
             onChange={onFileChange}
           />
           
-          <Button variant="outline" size="sm" onClick={() => handleMediaClick('image')} disabled={scrapbook?.isFinalized || isRecording}>
+          <Button variant="outline" size="sm" onClick={() => handleMediaClick('image')} disabled={scrapbook?.isFinalized || isRecording || isUploading}>
             <ImagePlus className="mr-2 h-4 w-4" />
             Photo
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setIsTextDialogOpen(true)} disabled={scrapbook?.isFinalized || isRecording}>
+          <Button variant="outline" size="sm" onClick={() => setIsTextDialogOpen(true)} disabled={scrapbook?.isFinalized || isRecording || isUploading}>
             <Type className="mr-2 h-4 w-4" />
             Text
           </Button>
-          <Button variant="outline" size="sm" onClick={() => handleMediaClick('video')} disabled={scrapbook?.isFinalized || isRecording}>
+          <Button variant="outline" size="sm" onClick={() => handleMediaClick('video')} disabled={scrapbook?.isFinalized || isRecording || isUploading}>
             <Video className="mr-2 h-4 w-4" />
             Video
           </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" disabled={scrapbook?.isFinalized || isRecording}>
+                <Button variant="outline" size="sm" disabled={scrapbook?.isFinalized || isRecording || isUploading}>
                     <Mic className="mr-2 h-4 w-4" />
                     Audio
                 </Button>
@@ -409,7 +393,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
             Share
           </Button>
           
-          <Button size="sm" onClick={handleFinalize} disabled={isFinalizing || scrapbook?.isFinalized || isRecording}>
+          <Button size="sm" onClick={handleFinalize} disabled={isFinalizing || scrapbook?.isFinalized || isRecording || isUploading}>
             {isFinalizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
             {scrapbook?.isFinalized ? "Finalized" : "Finalize"}
           </Button>
