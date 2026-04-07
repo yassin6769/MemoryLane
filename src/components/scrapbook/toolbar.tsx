@@ -422,7 +422,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
               Discard changes?
-            </AlertTriangle>
+            </AlertDialogTitle>
             <AlertDialogDescription>
               Your edits are automatically saved, but you haven't finalized this version yet. You can return to finish it anytime from your dashboard.
             </AlertDialogDescription>
