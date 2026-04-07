@@ -230,14 +230,13 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       // ADVANCED LOGGING: Capture raw server response for precision debugging
       const serverResponse = (error as any).customData?.serverResponse;
       console.error("[Storage Error] Code:", error.code);
-      console.error("[Storage Error] Message:", error.message);
       console.error("[Storage Error] Full Response:", serverResponse);
       
       let errorMessage = "An unexpected error occurred.";
       if (error.code === 'storage/unauthorized') {
-        errorMessage = "Permission Denied. Storage rules have been opened, but ensure they are deployed.";
+        errorMessage = "Permission Denied. Storage rules have been opened to 'allow read, write: if true', but check if deployment is complete.";
       } else if (error.code === 'storage/unknown') {
-        errorMessage = "Connection Blocked. This is likely a CORS issue. Run the gsutil command in the docs.";
+        errorMessage = "Connection Blocked. This is likely a CORS issue. Ensure CORS is permissive in GCP Console.";
       }
 
       toast({ 
