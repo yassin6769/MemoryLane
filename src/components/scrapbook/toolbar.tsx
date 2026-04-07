@@ -172,12 +172,12 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     console.log("[Storage Debug] Auth UID:", user.uid);
     console.log("[Storage Debug] Target Path:", storagePath);
 
-    const MAX_SIZE = 20 * 1024 * 1024; // Increased to 20MB
+    const MAX_SIZE = 50 * 1024 * 1024; // Increased to 50MB
     if (blob.size > MAX_SIZE) {
       toast({
         variant: "destructive",
         title: "File Too Large",
-        description: "Please select a file smaller than 20MB.",
+        description: "Please select a file smaller than 50MB.",
       });
       return;
     }
