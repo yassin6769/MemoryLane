@@ -227,7 +227,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       if (error.code === 'storage/unauthorized') {
         errorMessage = "Permission denied. We've re-triggered a rule sync. Please wait 60 seconds and try again.";
       } else if (error.code === 'storage/unknown') {
-        errorMessage = "Server communication error. This is often caused by network lag during rule synchronization. Please try again in 30 seconds.";
+        errorMessage = "Communication error. This can happen if rules are syncing or CORS is blocked. Please try again in 30 seconds.";
       }
 
       toast({ 
