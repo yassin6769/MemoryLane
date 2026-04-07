@@ -20,7 +20,7 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore, useUser, useStorage, useFirebaseApp } from "@/firebase";
+import { useFirestore, useUser, useStorage } from "@/firebase";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { collection, doc, serverTimestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -112,7 +112,15 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      
+      // Determine a supported mime type for the recorder
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') 
+        ? 'audio/webm' 
+        : MediaRecorder.isTypeSupported('audio/ogg')
+        ? 'audio/ogg'
+        : 'audio/mp4';
+
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       const chunks: Blob[] = [];
 
       mediaRecorder.ondataavailable = (e) => {
@@ -120,8 +128,9 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
-        await uploadMediaBlob(audioBlob, `voice_memo_${Date.now()}.webm`, 'audio');
+        const audioBlob = new Blob(chunks, { type: mimeType });
+        const extension = mimeType.split('/')[1] || 'webm';
+        await uploadMediaBlob(audioBlob, `voice_memo_${Date.now()}.${extension}`, 'audio');
         stream.getTracks().forEach(track => track.stop());
       };
 
@@ -216,7 +225,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       toast({ 
         variant: "destructive", 
         title: "Upload Failed", 
-        description: "Permission denied or communication error. Re-deployment triggered, please wait 30s." 
+        description: "Permission denied or communication error. Please try again." 
       });
     } finally {
       setIsUploading(false);
