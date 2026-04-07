@@ -169,6 +169,8 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       
       // Explicitly await the token refresh before creating the storage reference
       await user.getIdToken(true);
+      // Small delay to ensure auth state is propagated to SDK
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
       const storageRef = ref(storage, storagePath);
@@ -183,7 +185,6 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         }
       };
 
-      // uploadBytes is more stable for single-request environments
       const snapshot = await uploadBytes(storageRef, blob, metadata);
       const downloadUrl = await getDownloadURL(snapshot.ref);
       
@@ -223,16 +224,15 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
       toast({ title: "Memory added!" });
     } catch (error: any) {
-      // ADVANCED LOGGING: Capture raw server response for precision error fixing
       const serverResponse = (error as any).customData?.serverResponse;
       console.error("[Storage Error] Code:", error.code);
       console.error("[Storage Error] Full Response:", serverResponse);
       
       let errorMessage = "An unexpected error occurred.";
       if (error.code === 'storage/unauthorized') {
-        errorMessage = "Permission denied. Security rules are being re-deployed; please try again in 30 seconds.";
+        errorMessage = "Permission denied. Please wait a few moments for security rules to deploy and try again.";
       } else if (error.code === 'storage/unknown' || serverResponse === "") {
-        errorMessage = "Connection or CORS block. Retrying with fresh session...";
+        errorMessage = "Connection issues detected. Please check your network and try again.";
       }
 
       toast({ 

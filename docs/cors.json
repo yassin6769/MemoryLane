@@ -9,7 +9,8 @@
       "Content-Range", 
       "Origin", 
       "Accept",
-      "X-Requested-With"
+      "X-Requested-With",
+      "Access-Control-Allow-Origin"
     ],
     "maxAgeSeconds": 3600
   }

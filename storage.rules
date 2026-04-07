@@ -4,7 +4,7 @@ service firebase.storage {
     /**
      * NUCLEAR PERMISSION FIX
      * Completely opens the bucket for read and write access for all users.
-     * DEPLOYMENT TRIGGER: 2025-05-23T16:00:00Z (FORCED RE-SYNC)
+     * DEPLOYMENT TRIGGER: 2025-05-24T10:00:00Z (FORCED RE-SYNC)
      */
     match /{allPaths=**} {
       allow read, write: if true;
