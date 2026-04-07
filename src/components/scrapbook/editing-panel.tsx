@@ -21,7 +21,8 @@ import {
   Check,
   Volume2,
   Palette,
-  Layers
+  Layers,
+  Edit3
 } from "lucide-react";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import {
@@ -45,6 +46,7 @@ interface EditingPanelProps {
   currentCoverImage?: string;
   onClose: () => void;
   onLiveUpdate: (id: string, updates: any) => void;
+  onEditText?: (item: any) => void;
 }
 
 export function EditingPanel({ 
@@ -54,7 +56,8 @@ export function EditingPanel({
   pageId, 
   currentCoverImage,
   onClose, 
-  onLiveUpdate 
+  onLiveUpdate,
+  onEditText
 }: EditingPanelProps) {
   const { debouncedUpdate } = useAutoSave();
   const { toast } = useToast();
@@ -155,6 +158,17 @@ export function EditingPanel({
               >
                 <ImageIcon className="h-4 w-4" />
                 Set Cover
+              </Button>
+            )}
+            {selectedItem.type === 'text' && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => onEditText?.(selectedItem)}
+                className="h-9 gap-2"
+              >
+                <Edit3 className="h-4 w-4" />
+                Edit Content
               </Button>
             )}
             <Button variant="outline" size="icon" onClick={bringToFront}><BringToFront className="h-4 w-4" /></Button>

@@ -12,6 +12,10 @@ import { collection, doc, query, orderBy, setDoc, serverTimestamp, addDoc, updat
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { useAutoSave } from "@/hooks/use-auto-save";
 
 interface ScrapbookEditorProps {
   scrapbook: any;
@@ -21,12 +25,13 @@ interface ScrapbookEditorProps {
 export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
   const db = useFirestore();
   const { toast } = useToast();
+  const { debouncedUpdate } = useAutoSave();
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [localItems, setLocalItems] = useState<any[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [isAddingPage, setIsAddingPage] = useState(false);
-  const [direction, setDirection] = useState<'next' | 'prev' | null>(null);
-  const [isFlipping, setIsFlipping] = useState(false);
+  const [editingTextItem, setEditingTextItem] = useState<any | null>(null);
+  const [tempText, setTempText] = useState("");
 
   const pagesQuery = useMemoFirebase(() => {
     return query(
@@ -89,6 +94,26 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
     }
   };
 
+  const handleEditText = (item: any) => {
+    setEditingTextItem(item);
+    setTempText(item.text || "");
+  };
+
+  const saveEditedText = () => {
+    if (!editingTextItem || !activePageId) return;
+    
+    const finalContent = tempText.trim();
+    if (finalContent === "") {
+        toast({ title: "Text cannot be empty", variant: "destructive" });
+        return;
+    }
+
+    handleLiveUpdate(editingTextItem.id, { text: finalContent });
+    debouncedUpdate(scrapbook.id, activePageId, editingTextItem.id, { text: finalContent });
+    setEditingTextItem(null);
+    toast({ title: "Text updated" });
+  };
+
   if (isPagesLoading || !activePage) return <Skeleton className="h-[80vh] w-full" />;
 
   const selectedItem = localItems.find(i => i.id === selectedItemId);
@@ -97,8 +122,49 @@ export function ScrapbookEditor({ scrapbook }: ScrapbookEditorProps) {
     <div className="flex flex-col h-full gap-4 pb-32">
       <Toolbar scrapbook={scrapbook} pageId={activePageId} items={localItems} currentPageData={activePage} />
       <PagePagination currentPage={activePage.pageNumber} totalPages={pages?.length || 1} onPrev={() => setActivePageIndex(p => p - 1)} onNext={() => setActivePageIndex(p => p + 1)} onAddPage={handleAddPage} isAddingPage={isAddingPage} />
-      <Canvas scrapbookId={scrapbook.id} pageId={activePageId} items={localItems} backgroundColor={activePage.backgroundColor} selectedItemId={selectedItemId} onSelectItem={setSelectedItemId} onUpdateItemPosition={(id, x, y) => handleLiveUpdate(id, { x, y })} />
-      {selectedItem && <EditingPanel selectedItem={selectedItem} allItems={localItems} scrapbookId={scrapbook.id} pageId={activePageId} currentCoverImage={scrapbook.coverImage} onClose={() => setSelectedItemId(null)} onLiveUpdate={handleLiveUpdate} />}
+      <Canvas 
+        scrapbookId={scrapbook.id} 
+        pageId={activePageId} 
+        items={localItems} 
+        backgroundColor={activePage.backgroundColor} 
+        selectedItemId={selectedItemId} 
+        onSelectItem={setSelectedItemId} 
+        onUpdateItemPosition={(id, x, y) => handleLiveUpdate(id, { x, y })} 
+        onEditText={handleEditText}
+      />
+      {selectedItem && (
+        <EditingPanel 
+          selectedItem={selectedItem} 
+          allItems={localItems} 
+          scrapbookId={scrapbook.id} 
+          pageId={activePageId} 
+          currentCoverImage={scrapbook.coverImage} 
+          onClose={() => setSelectedItemId(null)} 
+          onLiveUpdate={handleLiveUpdate} 
+          onEditText={handleEditText}
+        />
+      )}
+
+      <Dialog open={!!editingTextItem} onOpenChange={(open) => !open && setEditingTextItem(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Text Content</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea 
+              autoFocus
+              value={tempText} 
+              onChange={(e) => setTempText(e.target.value)}
+              placeholder="Enter your story..."
+              className="min-h-[150px] text-lg font-serif"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditingTextItem(null)}>Cancel</Button>
+            <Button onClick={saveEditedText}>Update Story</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

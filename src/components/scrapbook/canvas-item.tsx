@@ -8,7 +8,7 @@ import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { doc, getFirestore } from "firebase/firestore";
 import { ref, deleteObject } from "firebase/storage";
 import { useStorage } from "@/firebase";
-import { Trash2, FlipHorizontal, Move, Play, CircleStop } from "lucide-react";
+import { Trash2, FlipHorizontal, Move, Play, CircleStop, Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import {
@@ -28,11 +28,12 @@ interface CanvasItemProps {
   isSelected: boolean;
   onSelect: () => void;
   onUpdatePosition: (id: string, x: number, y: number) => void;
+  onEditText?: (item: any) => void;
   scrapbookId: string;
   pageId: string;
 }
 
-export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrapbookId, pageId }: CanvasItemProps) {
+export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, onEditText, scrapbookId, pageId }: CanvasItemProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -255,6 +256,12 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
       <div
         ref={itemRef}
         onMouseDown={handleMouseDown}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          if (item.type === 'text' && onEditText) {
+            onEditText(item);
+          }
+        }}
         className={cn(
           "absolute transition-shadow duration-300 transform-gpu select-none",
           isDragging ? "cursor-grabbing shadow-2xl z-[9999]" : "cursor-grab shadow-sm hover:shadow-md",
@@ -304,6 +311,17 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, scrap
             >
               <FlipHorizontal className="h-3.5 w-3.5" />
             </Button>
+            
+            {item.type === 'text' && (
+              <Button 
+                variant="secondary" 
+                size="icon" 
+                className="absolute -top-3 -left-3 h-7 w-7 rounded-full shadow-lg action-button pointer-events-auto z-[1002]"
+                onClick={(e) => { e.stopPropagation(); onEditText?.(item); }}
+              >
+                <Edit3 className="h-3.5 w-3.5" />
+              </Button>
+            )}
 
             <div className="absolute inset-0 border-2 border-dashed border-primary/40 rounded-sm pointer-events-none" />
           </>

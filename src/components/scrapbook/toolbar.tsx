@@ -230,8 +230,15 @@ export function Toolbar({ scrapbook, pageId, items = [], currentPageData }: Tool
         </DialogContent>
       </Dialog>
       <AlertDialog open={isBackDialogOpen} onOpenChange={setIsBackDialogOpen}>
-        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Exit Editor?</AlertDialogTitle><AlertDialogDescription>Your changes are saved automatically.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Continue Editing</AlertDialogCancel><AlertDialogAction onClick={() => router.push("/dashboard")} className="bg-destructive">Exit</AlertDialogAction></AlertDialogFooter>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Exit Editor?</AlertDialogTitle>
+            <AlertDialogDescription>Your changes are saved automatically.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continue Editing</AlertDialogCancel>
+            <AlertDialogAction onClick={() => router.push("/dashboard")} className="bg-destructive">Exit</AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

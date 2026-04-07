@@ -28,6 +28,7 @@ interface CanvasProps {
   selectedItemId: string | null;
   onSelectItem: (id: string | null) => void;
   onUpdateItemPosition: (id: string, x: number, y: number) => void;
+  onEditText?: (item: any) => void;
   className?: string;
 }
 
@@ -39,6 +40,7 @@ export function Canvas({
   selectedItemId, 
   onSelectItem, 
   onUpdateItemPosition, 
+  onEditText,
   className 
 }: CanvasProps) {
   const { toast } = useToast();
@@ -81,6 +83,7 @@ export function Canvas({
             isSelected={selectedItemId === item.id}
             onSelect={() => onSelectItem(item.id)}
             onUpdatePosition={onUpdateItemPosition}
+            onEditText={onEditText}
             scrapbookId={scrapbookId}
             pageId={pageId}
           />
