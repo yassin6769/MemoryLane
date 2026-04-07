@@ -221,7 +221,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
       toast({ title: "Memory added!" });
     } catch (error: any) {
-      // ADVANCED LOGGING: Capture raw server response for precision debugging
+      // ADVANCED LOGGING: Capture raw server response for precision error fixing
       const serverResponse = (error as any).customData?.serverResponse;
       console.error("[Storage Error] Code:", error.code);
       console.error("[Storage Error] Full Response:", serverResponse);
