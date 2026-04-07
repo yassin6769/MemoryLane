@@ -165,6 +165,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     try {
       // FORCE TOKEN REFRESH to ensure session is active with new rules
       await user.getIdToken(true);
+      // Brief pause to allow backend sync
       await new Promise(resolve => setTimeout(resolve, 500)); 
 
       const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
@@ -182,6 +183,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
       const objectData = {
         pageId,
+        id: "obj_" + Date.now(),
         type: type,
         mediaUri: downloadUrl,
         members: scrapbook.members || { [user.uid]: 'owner' },
@@ -212,6 +214,8 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       toast({ title: "Memory added!" });
     } catch (error: any) {
       console.error("[Storage Error] Code:", error.code);
+      console.error("[Storage Error] Details:", error);
+      
       let errorMessage = "An unexpected error occurred.";
       if (error.code === 'storage/unauthorized') {
         errorMessage = "Permission denied. Please wait a few moments for security rules to deploy and try again.";
@@ -242,6 +246,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
     addDocumentNonBlocking(objectsCol, {
       pageId,
+      id: "text_" + Date.now(),
       type: "text",
       text: textInput,
       isBold: false,
