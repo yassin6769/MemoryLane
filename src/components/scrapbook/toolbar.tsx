@@ -20,7 +20,7 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore, useUser, useStorage } from "@/firebase";
+import { useFirestore, useUser, useStorage, useFirebaseApp } from "@/firebase";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { collection, doc, serverTimestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -56,6 +56,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
   const db = useFirestore();
   const storage = useStorage();
   const { user } = useUser();
+  const app = useFirebaseApp();
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isTextDialogOpen, setIsTextDialogOpen] = useState(false);
@@ -162,26 +163,16 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     setCurrentMediaType(type);
 
     try {
-      // FORCE TOKEN REFRESH: This is critical for Storage rules to recognize the session.
+      // FORCE TOKEN REFRESH: Ensures the session is synchronized with the Storage server.
       console.log("[Storage] Refreshing auth token...");
-      const idToken = await user.getIdToken(true);
-      console.log("[Auth] Token refreshed. Session is active for UID:", user.uid);
+      await user.getIdToken(true);
+      console.log("[Storage] Session Sync OK. Bucket:", app.options.storageBucket);
 
       const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
-      console.log("[Storage] Attempting upload to:", storagePath);
-
-      const MAX_SIZE = 50 * 1024 * 1024; // 50MB
-      if (blob.size > MAX_SIZE) {
-        toast({
-          variant: "destructive",
-          title: "File Too Large",
-          description: "Maximum file size is 50MB.",
-        });
-        setIsUploading(false);
-        return;
-      }
-      
       const storageRef = ref(storage, storagePath);
+      
+      console.log("[Storage] Path:", storagePath);
+
       const metadata = {
         contentType: blob.type || (type === 'image' ? 'image/jpeg' : type === 'video' ? 'video/mp4' : 'audio/mpeg'),
         customMetadata: {
@@ -190,11 +181,11 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         }
       };
 
-      // Use uploadBytes for simplicity in this environment
+      // Direct upload for maximum stability in this environment
       const snapshot = await uploadBytes(storageRef, blob, metadata);
       const downloadUrl = await getDownloadURL(snapshot.ref);
       
-      console.log("[Storage] Upload successful! URL:", downloadUrl);
+      console.log("[Storage] Upload Success:", downloadUrl);
 
       const objectsCol = collection(db, "scrapbooks", scrapbook.id, "pages", pageId, "canvasObjects");
       const nextZIndex = items.length > 0 ? Math.max(...items.map((i: any) => i.zIndex || 0)) + 1 : 1;
@@ -220,7 +211,6 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       
       addDocumentNonBlocking(objectsCol, objectData);
 
-      // Auto-set cover image if none exists
       if (type === 'image' && (!scrapbook.coverImage || scrapbook.coverImage === "")) {
         const scrapbookRef = doc(db, "scrapbooks", scrapbook.id);
         updateDocumentNonBlocking(scrapbookRef, {
@@ -229,18 +219,17 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         });
       }
 
-      toast({ title: "Success", description: "Memory added to canvas." });
+      toast({ title: "Memory added!" });
     } catch (error: any) {
-      // ADVANCED LOGGING: Capture raw server response for precision error fixing
       const serverResponse = (error as any).customData?.serverResponse;
       console.error("[Storage Error] Code:", error.code);
       console.error("[Storage Error] Full Response:", serverResponse);
       
       let errorMessage = "An unexpected error occurred.";
       if (error.code === 'storage/unauthorized') {
-        errorMessage = "Permission denied. Security rules are set to 'if true', but please allow a few moments for deployment to complete.";
+        errorMessage = "Permission denied. Storage rules have been opened to 'allow read, write: if true', but please allow a few moments for deployment to complete.";
       } else if (error.code === 'storage/unknown') {
-        errorMessage = "Network or CORS error. Ensure your environment allows connections to Firebase Storage.";
+        errorMessage = "Network or CORS error. Check browser console for full response.";
       }
 
       toast({ 
@@ -299,11 +288,11 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       {isUploading && (
         <div className="w-full space-y-2 px-1">
           <div className="flex justify-between text-xs font-medium">
-            <span className="animate-pulse flex items-center gap-2">
+            <span className="animate-pulse flex items-center gap-2 text-primary">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 Uploading {currentMediaType}...
             </span>
-            <span className="text-muted-foreground italic">Sending memory to cloud...</span>
+            <span className="text-muted-foreground italic">Preserving memory...</span>
           </div>
           <Progress value={undefined} className="h-2" />
         </div>
