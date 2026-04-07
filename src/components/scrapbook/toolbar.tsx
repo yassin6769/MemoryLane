@@ -225,7 +225,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       
       let errorMessage = "An unexpected error occurred.";
       if (error.code === 'storage/unauthorized') {
-        errorMessage = "Permission denied. We've re-triggered a rule sync. Please wait 30 seconds and try again.";
+        errorMessage = "Permission denied. We've re-triggered a rule sync. Please wait 60 seconds and try again.";
       }
 
       toast({ 
