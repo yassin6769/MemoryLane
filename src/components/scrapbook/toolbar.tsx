@@ -163,9 +163,11 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     setCurrentMediaType(type);
 
     try {
-      // FORCE TOKEN REFRESH & SYNC: Essential for ensuring open rules recognize the session
+      // FORCE TOKEN REFRESH & SYNC: Essential for ensuring open rules recognize the session immediately
       console.log("[Storage] Syncing session with bucket:", app.options.storageBucket);
       console.log("[Storage] Auth UID:", user.uid);
+      
+      // Explicitly await the token refresh before creating the storage reference
       await user.getIdToken(true);
 
       const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
