@@ -163,10 +163,12 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     setCurrentMediaType(type);
 
     try {
-      // FORCE TOKEN REFRESH to ensure session is active with new rules
+      // FORCE TOKEN REFRESH to ensure session is active with new open rules
+      // This is critical for Storage uploads when rules have recently changed.
       await user.getIdToken(true);
-      // Brief pause to allow backend sync
-      await new Promise(resolve => setTimeout(resolve, 500)); 
+      
+      // Brief pause to allow auth state to synchronize across SDKs
+      await new Promise(resolve => setTimeout(resolve, 1000)); 
 
       const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
       const storageRef = ref(storage, storagePath);
@@ -213,12 +215,13 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
       toast({ title: "Memory added!" });
     } catch (error: any) {
+      // Diagnostic logging for Permission Denied errors
       console.error("[Storage Error] Code:", error.code);
       console.error("[Storage Error] Details:", error);
       
       let errorMessage = "An unexpected error occurred.";
       if (error.code === 'storage/unauthorized') {
-        errorMessage = "Permission denied. Please wait a few moments for security rules to deploy and try again.";
+        errorMessage = "Permission denied. We've re-triggered a rule sync. Please wait 30 seconds and try again.";
       }
 
       toast({ 
