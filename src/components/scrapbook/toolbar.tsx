@@ -164,16 +164,13 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
      */
     try {
       await user.getIdToken(true);
-      console.log("[Auth] Token refreshed for upload.");
+      console.log("[Auth] Token refreshed for upload. UID:", user.uid);
     } catch (e) {
       console.error("[Auth] Token refresh failed:", e);
     }
 
     const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
-    
-    // DIAGNOSTIC LOGGING
-    console.log("[Storage Debug] Auth UID:", user.uid);
-    console.log("[Storage Debug] Target Path:", storagePath);
+    console.log("[Storage Debug] Path:", storagePath);
 
     const MAX_SIZE = 50 * 1024 * 1024; // 50MB limit
     if (blob.size > MAX_SIZE) {
@@ -204,14 +201,16 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         (error: StorageError) => {
           setUploadProgress(null);
           
-          // ADVANCED LOGGING: Capture the raw server response for precision error fixing
+          // ADVANCED LOGGING: Capture raw server response for precision debugging
           const serverResponse = (error as any).customData?.serverResponse;
           console.error("[Storage Error] Code:", error.code);
           console.error("[Storage Error] Full Response:", serverResponse);
           
           let errorMessage = "An unexpected error occurred.";
           if (error.code === 'storage/unauthorized') {
-            errorMessage = "Permission Denied. The storage rules should be set to 'allow read, write: if true' for all users.";
+            errorMessage = "Permission Denied. Storage rules are currently set to 'allow read, write: if true'.";
+          } else if (error.code === 'storage/unknown') {
+            errorMessage = "Unknown error. This is often caused by a CORS policy blocking the request from the browser.";
           }
 
           toast({ 
