@@ -153,15 +153,12 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         toast({ 
             variant: "destructive", 
             title: "Upload Blocked", 
-            description: "Missing required services or session. Please log in again." 
+            description: "Session error. Please refresh and try again." 
         });
         return;
     }
 
-    /**
-     * FORCE TOKEN REFRESH
-     * Ensures the authentication session is active and recognized by Firebase Storage.
-     */
+    // Force refresh the auth token to ensure the Storage request is signed with the latest credentials
     try {
       await user.getIdToken(true);
       console.log("[Auth] Token refreshed for upload. UID:", user.uid);
@@ -170,7 +167,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     }
 
     const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
-    console.log("[Storage Debug] Path:", storagePath);
+    console.log("[Storage] Attempting upload to:", storagePath);
 
     const MAX_SIZE = 50 * 1024 * 1024; // 50MB limit
     if (blob.size > MAX_SIZE) {
@@ -208,9 +205,9 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
           
           let errorMessage = "An unexpected error occurred.";
           if (error.code === 'storage/unauthorized') {
-            errorMessage = "Permission Denied. Storage rules are currently set to 'allow read, write: if true'.";
+            errorMessage = "Permission Denied. Storage rules have been opened, but the session might be stale.";
           } else if (error.code === 'storage/unknown') {
-            errorMessage = "Unknown error. This is often caused by a CORS policy blocking the request from the browser.";
+            errorMessage = "Unknown error. This usually indicates a CORS policy mismatch or network interruption.";
           }
 
           toast({ 
@@ -231,8 +228,8 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
             members: scrapbook.members,
             x: 100,
             y: 100,
-            width: type === 'audio' ? 300 : (type === 'text' ? 280 : 120),
-            height: type === 'audio' ? 120 : (type === 'text' ? 120 : 250),
+            width: type === 'audio' ? 300 : (type === 'text' ? 280 : 250),
+            height: type === 'audio' ? 120 : (type === 'text' ? 120 : 350),
             rotation: 0,
             scaleX: 1,
             scaleY: 1,
