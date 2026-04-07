@@ -172,7 +172,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     console.log("[Storage Debug] Auth UID:", user.uid);
     console.log("[Storage Debug] Target Path:", storagePath);
 
-    const MAX_SIZE = 50 * 1024 * 1024; // Increased to 50MB
+    const MAX_SIZE = 50 * 1024 * 1024; // 50MB limit
     if (blob.size > MAX_SIZE) {
       toast({
         variant: "destructive",
@@ -208,7 +208,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
           
           let errorMessage = "An unexpected error occurred.";
           if (error.code === 'storage/unauthorized') {
-            errorMessage = "Permission Denied. Please ensure your storage rules are correctly applied.";
+            errorMessage = "Permission Denied. Please ensure your storage rules are fully open (allow read, write: if true).";
           } else if (error.code === 'storage/canceled') {
             errorMessage = "Upload canceled.";
           }

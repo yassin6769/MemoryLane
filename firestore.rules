@@ -2,9 +2,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     /**
-     * NUCLEAR PERMISSION FIX
-     * Completely opens the database for read and write access.
-     * Ensures that text objects and media metadata are always saved.
+     * NUCLEAR PERMISSION FIX (Applied)
+     * Completely opens the database for read and write access for all users.
+     * Ensures that text objects and media metadata are always saved successfully.
      */
     match /{allPaths=**} {
       allow read, write: if true;
