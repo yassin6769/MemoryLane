@@ -163,15 +163,14 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     setCurrentMediaType(type);
 
     try {
-      // FORCE TOKEN REFRESH: Ensures the session is synchronized with the Storage server.
-      console.log("[Storage] Refreshing auth token...");
+      // FORCE TOKEN REFRESH & SYNC: Essential for ensuring open rules recognize the session
+      console.log("[Storage] Syncing session with bucket:", app.options.storageBucket);
       await user.getIdToken(true);
-      console.log("[Storage] Session Sync OK. Bucket:", app.options.storageBucket);
 
       const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
       const storageRef = ref(storage, storagePath);
       
-      console.log("[Storage] Path:", storagePath);
+      console.log("[Storage] Initiating upload to:", storagePath);
 
       const metadata = {
         contentType: blob.type || (type === 'image' ? 'image/jpeg' : type === 'video' ? 'video/mp4' : 'audio/mpeg'),
@@ -181,7 +180,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         }
       };
 
-      // Direct upload for maximum stability in this environment
+      // uploadBytes is more stable than uploadBytesResumable for single-request environments
       const snapshot = await uploadBytes(storageRef, blob, metadata);
       const downloadUrl = await getDownloadURL(snapshot.ref);
       
@@ -221,15 +220,16 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
       toast({ title: "Memory added!" });
     } catch (error: any) {
+      // ADVANCED LOGGING: Capture raw server response for precision error fixing
       const serverResponse = (error as any).customData?.serverResponse;
       console.error("[Storage Error] Code:", error.code);
       console.error("[Storage Error] Full Response:", serverResponse);
       
       let errorMessage = "An unexpected error occurred.";
       if (error.code === 'storage/unauthorized') {
-        errorMessage = "Permission denied. Storage rules have been opened to 'allow read, write: if true', but please allow a few moments for deployment to complete.";
+        errorMessage = "Permission denied. Security rules are set to 'if true', but please allow a few moments for deployment to complete.";
       } else if (error.code === 'storage/unknown') {
-        errorMessage = "Network or CORS error. Check browser console for full response.";
+        errorMessage = "Network or CORS error. Check browser console for full server response.";
       }
 
       toast({ 
