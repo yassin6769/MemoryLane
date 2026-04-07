@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef } from "react";
@@ -114,7 +113,6 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
-      // Determine a supported mime type for the recorder
       const mimeType = MediaRecorder.isTypeSupported('audio/webm') 
         ? 'audio/webm' 
         : MediaRecorder.isTypeSupported('audio/ogg')
@@ -172,10 +170,9 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     setCurrentMediaType(type);
 
     try {
-      // Force a token refresh to ensure synced session with Nuclear Rules
+      // Force token refresh to sync session
       await user.getIdToken(true);
-      await new Promise(resolve => setTimeout(resolve, 800)); 
-
+      
       const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
       const storageRef = ref(storage, storagePath);
       
@@ -226,7 +223,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       toast({ 
         variant: "destructive", 
         title: "Upload Failed", 
-        description: "Communication error while preserving memory. Please try again." 
+        description: "Could not upload media. Please try again." 
       });
     } finally {
       setIsUploading(false);
