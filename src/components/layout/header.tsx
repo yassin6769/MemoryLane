@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Home, Menu, Search, Settings, Users, Library } from "lucide-react";
+import { Menu, Settings, Users, Library } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import {
@@ -14,7 +14,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Logo } from "../icons/logo";
@@ -74,14 +73,8 @@ export default function AppHeader() {
         </SheetContent>
       </Sheet>
 
-      <div className="relative ml-auto flex-1 md:grow-0">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          type="search"
-          placeholder="Search scrapbooks..."
-          className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
-        />
-      </div>
+      <div className="ml-auto" />
+      
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button

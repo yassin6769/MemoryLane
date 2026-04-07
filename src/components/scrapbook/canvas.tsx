@@ -1,4 +1,3 @@
-
 "use client";
 
 import { CanvasItem } from "./canvas-item";
@@ -14,7 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+} from "@/components/ui/dialog"; // Use dialog components consistently
 import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { doc, getFirestore } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
@@ -57,7 +56,7 @@ export function Canvas({ scrapbookId, pageId, items, selectedItemId, onSelectIte
     <div className={cn("flex flex-col gap-4 h-full preserve-3d backface-hidden", className)}>
       <div
         onClick={handleCanvasClick}
-        className="relative w-full h-[70vh] rounded-lg overflow-hidden border bg-white shadow-inner preserve-3d cursor-crosshair"
+        className="relative w-full h-[80vh] rounded-lg overflow-hidden border bg-white shadow-inner preserve-3d cursor-crosshair"
         style={{
           backgroundImage:
             "radial-gradient(circle at 1px 1px, hsl(var(--border)) 1px, transparent 0)",
