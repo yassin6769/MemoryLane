@@ -17,6 +17,11 @@ import {
   Radio,
   FileAudio,
   Palette,
+  Shapes,
+  Circle,
+  Square,
+  Triangle,
+  Minus
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -158,15 +163,29 @@ export function Toolbar({ scrapbook, pageId, items = [], currentPageData }: Tool
   const saveText = () => {
     if (!textInput.trim() || !pageId || !user) return;
     const objectsCol = collection(db, "scrapbooks", scrapbook.id, "pages", pageId, "canvasObjects");
+    const nextZIndex = items.length > 0 ? Math.max(...items.map((i: any) => i.zIndex || 0)) + 1 : 1;
     addDocumentNonBlocking(objectsCol, {
       pageId, type: "text", text: textInput, textColor: "#000000", alpha: 100,
       id: "text_" + Date.now(), fontSize: 24, fontFamily: "font-serif",
-      members: scrapbook.members, x: 150, y: 150, width: 280, height: 120, zIndex: 99,
+      members: scrapbook.members, x: 150, y: 150, width: 280, height: 120, zIndex: nextZIndex,
       createdAt: serverTimestamp(),
     });
     setTextInput("");
     setIsTextDialogOpen(false);
     toast({ title: "Text added!" });
+  };
+
+  const addShape = (shapeType: string) => {
+    if (!pageId || !user) return;
+    const objectsCol = collection(db, "scrapbooks", scrapbook.id, "pages", pageId, "canvasObjects");
+    const nextZIndex = items.length > 0 ? Math.max(...items.map((i: any) => i.zIndex || 0)) + 1 : 1;
+    addDocumentNonBlocking(objectsCol, {
+      pageId, type: "shape", shapeType, fillColor: "#f1b36a", alpha: 100,
+      id: "shape_" + Date.now(), members: scrapbook.members,
+      x: 200, y: 200, width: 150, height: 150, zIndex: nextZIndex,
+      createdAt: serverTimestamp(),
+    });
+    toast({ title: `${shapeType} added!` });
   };
 
   return (
@@ -207,6 +226,18 @@ export function Toolbar({ scrapbook, pageId, items = [], currentPageData }: Tool
           <Button variant="outline" size="sm" onClick={() => { setCurrentMediaType('image'); setTimeout(() => fileInputRef.current?.click(), 0); }}><ImagePlus className="mr-2 h-4 w-4" /> Photo</Button>
           <Button variant="outline" size="sm" onClick={() => setIsTextDialogOpen(true)}><Type className="mr-2 h-4 w-4" /> Text</Button>
           
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm"><Shapes className="mr-2 h-4 w-4" /> Shapes</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => addShape('circle')}><Circle className="mr-2 h-4 w-4" /> Circle</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => addShape('square')}><Square className="mr-2 h-4 w-4" /> Square</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => addShape('rectangle')}><Minus className="mr-2 h-4 w-4" /> Rectangle</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => addShape('triangle')}><Triangle className="mr-2 h-4 w-4" /> Triangle</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Mic className="mr-2 h-4 w-4" /> Voice Memo</Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">

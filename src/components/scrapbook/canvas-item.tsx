@@ -143,7 +143,7 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, onEdi
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      if (item.mediaUri && item.type !== 'text') {
+      if (item.mediaUri && item.type !== 'text' && item.type !== 'shape') {
         try {
           const storageRef = ref(storage, item.mediaUri);
           await deleteObject(storageRef);
@@ -162,21 +162,29 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, onEdi
     }
   };
 
+  const getShapeStyles = () => {
+    if (!item.shapeType || item.shapeType === 'none' || item.shapeType === 'rectangle') return {};
+    if (item.shapeType === 'circle') return { borderRadius: '100%' };
+    if (item.shapeType === 'square') return { aspectRatio: '1/1' };
+    if (item.shapeType === 'triangle') return { clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)' };
+    return {};
+  };
+
   const renderContent = () => {
-    const contentStyles = {
+    const commonStyles = {
       borderWidth: `${item.borderWidth || 0}px`,
       borderColor: item.borderColor || '#000000',
       borderStyle: item.borderWidth > 0 ? 'solid' : 'none',
-      padding: `${item.borderWidth || 0}px`,
       opacity: (item.alpha !== undefined ? item.alpha : 100) / 100,
+      ...getShapeStyles()
     };
 
     switch (item.type) {
       case "image":
         return (
           <div 
-            className="relative w-full h-full overflow-hidden rounded-sm pointer-events-none select-none bg-muted/20"
-            style={contentStyles}
+            className="relative w-full h-full overflow-hidden pointer-events-none select-none bg-muted/20"
+            style={commonStyles}
           >
             <Image
               src={item.mediaUri}
@@ -191,7 +199,7 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, onEdi
         return (
           <div 
             className="w-full h-full p-6 flex items-center justify-center pointer-events-none bg-transparent rounded-lg overflow-hidden"
-            style={contentStyles}
+            style={commonStyles}
           >
             <p className={cn(
               "text-center leading-relaxed whitespace-pre-wrap",
@@ -211,8 +219,8 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, onEdi
       case "video":
         return (
           <div 
-            className="relative w-full h-full pointer-events-none rounded-sm bg-black overflow-hidden shadow-inner group/video"
-            style={contentStyles}
+            className="relative w-full h-full pointer-events-none bg-black overflow-hidden shadow-inner group/video"
+            style={commonStyles}
           >
             <video 
               src={item.mediaUri} 
@@ -225,7 +233,7 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, onEdi
         return (
           <div 
             className="w-full h-full flex flex-col items-center justify-center p-4 bg-primary/10 rounded-xl border-2 border-primary/20 shadow-sm overflow-hidden"
-            style={contentStyles}
+            style={commonStyles}
           >
             <audio 
               ref={audioRef} 
@@ -245,6 +253,16 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, onEdi
             </Button>
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary pointer-events-none">Voice Memo</p>
           </div>
+        );
+      case "shape":
+        return (
+          <div 
+            className="w-full h-full"
+            style={{
+              ...commonStyles,
+              backgroundColor: item.fillColor || "#f1b36a"
+            }}
+          />
         );
       default:
         return null;
@@ -266,7 +284,7 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, onEdi
           "absolute transition-shadow duration-300 transform-gpu select-none",
           isDragging ? "cursor-grabbing shadow-2xl z-[9999]" : "cursor-grab shadow-sm hover:shadow-md",
           isSelected ? "ring-2 ring-primary ring-offset-2 z-[999] shadow-xl" : "",
-          item.type === "text" || item.type === "audio" ? "bg-transparent" : "bg-white p-2 border border-muted/30 rounded-sm"
+          item.type === "text" || item.type === "audio" || item.type === "shape" ? "bg-transparent" : "bg-white p-2 border border-muted/30 rounded-sm"
         )}
         style={{
           left: `${item.x}px`,

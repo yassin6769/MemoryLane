@@ -22,7 +22,9 @@ import {
   Volume2,
   Palette,
   Layers,
-  Edit3
+  Edit3,
+  Circle,
+  Triangle
 } from "lucide-react";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import {
@@ -99,9 +101,15 @@ export function EditingPanel({
     debouncedUpdate(scrapbookId, pageId, selectedItem.id, { alpha: newAlpha });
   };
 
-  const handleTextColorChange = (color: string) => {
-    onLiveUpdate(selectedItem.id, { textColor: color });
-    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { textColor: color });
+  const handleColorChange = (color: string) => {
+    const field = selectedItem.type === 'text' ? 'textColor' : 'fillColor';
+    onLiveUpdate(selectedItem.id, { [field]: color });
+    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { [field]: color });
+  };
+
+  const handleShapeChange = (shape: string) => {
+    onLiveUpdate(selectedItem.id, { shapeType: shape });
+    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { shapeType: shape });
   };
 
   const bringToFront = () => {
@@ -138,6 +146,13 @@ export function EditingPanel({
     { name: "Sage", value: "#a7f3d0" },
     { name: "Rose", value: "#fda4af" },
     { name: "Slate", value: "#475569" },
+  ];
+
+  const shapes = [
+    { id: 'none', label: 'No Mask', icon: X },
+    { id: 'circle', label: 'Circle', icon: Circle },
+    { id: 'square', label: 'Square', icon: Square },
+    { id: 'triangle', label: 'Triangle', icon: Triangle },
   ];
 
   return (
@@ -194,21 +209,43 @@ export function EditingPanel({
               <Label className="flex items-center gap-2 text-sm font-medium"><Layers className="h-4 w-4" /> Transparency ({alpha}%)</Label>
               <Slider value={[alpha]} min={0} max={100} onValueChange={handleAlphaChange} />
             </div>
-            {selectedItem.type === 'text' && (
+            {(selectedItem.type === 'text' || selectedItem.type === 'shape') && (
               <div className="space-y-3">
-                <Label className="flex items-center gap-2 text-sm font-medium"><Palette className="h-4 w-4" /> Text Color</Label>
+                <Label className="flex items-center gap-2 text-sm font-medium"><Palette className="h-4 w-4" /> {selectedItem.type === 'text' ? 'Text Color' : 'Fill Color'}</Label>
                 <div className="flex flex-wrap gap-2">
                   {colors.map((color) => (
                     <button
                       key={color.value}
-                      onClick={() => handleTextColorChange(color.value)}
+                      onClick={() => handleColorChange(color.value)}
                       className={cn(
                         "h-7 w-7 rounded-full border border-muted transition-transform hover:scale-110",
-                        selectedItem.textColor === color.value && "ring-2 ring-primary ring-offset-2"
+                        (selectedItem.textColor === color.value || selectedItem.fillColor === color.value) && "ring-2 ring-primary ring-offset-2"
                       )}
                       style={{ backgroundColor: color.value }}
                     />
                   ))}
+                </div>
+              </div>
+            )}
+            {(selectedItem.type === 'image' || selectedItem.type === 'video' || selectedItem.type === 'shape') && (
+              <div className="space-y-3">
+                <Label className="flex items-center gap-2 text-sm font-medium">Shape / Mask</Label>
+                <div className="flex gap-2">
+                  {shapes.map((s) => {
+                    const Icon = s.icon;
+                    return (
+                      <Button
+                        key={s.id}
+                        variant={selectedItem.shapeType === s.id ? "default" : "outline"}
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleShapeChange(s.id)}
+                        title={s.label}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </Button>
+                    );
+                  })}
                 </div>
               </div>
             )}

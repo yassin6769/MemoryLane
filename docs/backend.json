@@ -68,7 +68,9 @@
       "properties": {
         "id": { "type": "string" },
         "pageId": { "type": "string" },
-        "type": { "type": "string", "enum": ["image", "video", "audio", "text"] },
+        "type": { "type": "string", "enum": ["image", "video", "audio", "text", "shape"] },
+        "shapeType": { "type": "string", "enum": ["none", "circle", "square", "rectangle", "triangle"], "default": "none" },
+        "fillColor": { "type": "string", "default": "#f1b36a" },
         "mediaUri": { "type": "string", "format": "uri" },
         "text": { "type": "string" },
         "textColor": { "type": "string", "default": "#000000" },
