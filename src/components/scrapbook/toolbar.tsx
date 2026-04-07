@@ -163,19 +163,14 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     setCurrentMediaType(type);
 
     try {
-      // FORCE TOKEN REFRESH & SYNC
-      // Critical step to ensure the SDK uses a valid credential that the open rules recognize.
-      // We also add a small delay to allow for the backend to propagate the auth state.
-      console.log("[Storage] Refreshing auth token...");
+      // FORCE TOKEN REFRESH
+      // This ensures we are using a fresh credential that matches our open rules immediately.
       await user.getIdToken(true);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 500)); // Brief sync period
 
       const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
       const storageRef = ref(storage, storagePath);
       
-      console.log("[Storage] Starting upload to:", storageRef.fullPath);
-      console.log("[Storage] Auth UID:", user.uid);
-
       const metadata = {
         contentType: blob.type || (type === 'image' ? 'image/jpeg' : type === 'video' ? 'video/mp4' : 'audio/mpeg'),
       };
@@ -217,10 +212,8 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
       toast({ title: "Memory added!" });
     } catch (error: any) {
-      // ADVANCED LOGGING: Capture raw server response for precision error fixing
-      const serverResponse = (error as any).customData?.serverResponse;
       console.error("[Storage Error] Code:", error.code);
-      console.error("[Storage Error] Full Response:", serverResponse);
+      console.error("[Storage Error] Details:", error);
       
       let errorMessage = "An unexpected error occurred.";
       if (error.code === 'storage/unauthorized') {
