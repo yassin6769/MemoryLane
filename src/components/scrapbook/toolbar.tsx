@@ -14,7 +14,8 @@ import {
   AlertTriangle,
   CircleStop,
   Radio,
-  FileAudio
+  FileAudio,
+  Play
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
