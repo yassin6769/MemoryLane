@@ -2,9 +2,9 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     /**
-     * NUCLEAR PERMISSION FIX (Applied)
-     * Completely opens the bucket for read and write access for all users (including unauthenticated).
-     * This resolves all "storage/unauthorized" errors by removing path-based security hurdles.
+     * NUCLEAR PERMISSION FIX
+     * Completely opens the bucket for read and write access for all users.
+     * This resolves all "storage/unauthorized" errors by removing all security hurdles.
      */
     match /{allPaths=**} {
       allow read, write: if true;

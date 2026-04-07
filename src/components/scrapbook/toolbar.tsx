@@ -158,10 +158,13 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         return;
     }
 
-    // CRITICAL: Force Token Refresh to ensure session is active and recognized by rules
+    /**
+     * FORCE TOKEN REFRESH
+     * Ensures the authentication session is active and recognized by Firebase Storage.
+     */
     try {
       await user.getIdToken(true);
-      console.log("[Auth] Token refreshed successfully.");
+      console.log("[Auth] Token refreshed for upload.");
     } catch (e) {
       console.error("[Auth] Token refresh failed:", e);
     }
@@ -201,16 +204,14 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         (error: StorageError) => {
           setUploadProgress(null);
           
-          // Capture raw server response for precision debugging
+          // ADVANCED LOGGING: Capture the raw server response for precision error fixing
           const serverResponse = (error as any).customData?.serverResponse;
           console.error("[Storage Error] Code:", error.code);
           console.error("[Storage Error] Full Response:", serverResponse);
           
           let errorMessage = "An unexpected error occurred.";
           if (error.code === 'storage/unauthorized') {
-            errorMessage = "Permission Denied. Please ensure your storage rules are fully open (allow read, write: if true).";
-          } else if (error.code === 'storage/canceled') {
-            errorMessage = "Upload canceled.";
+            errorMessage = "Permission Denied. The storage rules should be set to 'allow read, write: if true' for all users.";
           }
 
           toast({ 
