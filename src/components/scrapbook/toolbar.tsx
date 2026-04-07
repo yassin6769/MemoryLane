@@ -152,29 +152,29 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     if (!storage || !user || !pageId) {
         toast({ 
             variant: "destructive", 
-            title: "Upload Blocked", 
-            description: "Session error. Please refresh and try again." 
+            title: "Session Error", 
+            description: "Missing required services. Please refresh." 
         });
         return;
     }
 
-    // Force refresh the auth token to ensure the Storage request is signed with the latest credentials
+    // MANDATORY: Force token refresh to prevent "Unauthorized" on stale sessions
     try {
       await user.getIdToken(true);
-      console.log("[Auth] Token refreshed for upload. UID:", user.uid);
+      console.log("[Auth] Session refreshed for upload. UID:", user.uid);
     } catch (e) {
       console.error("[Auth] Token refresh failed:", e);
     }
 
     const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
-    console.log("[Storage] Attempting upload to:", storagePath);
+    console.log("[Storage] Initiating upload to:", storagePath);
 
-    const MAX_SIZE = 50 * 1024 * 1024; // 50MB limit
+    const MAX_SIZE = 50 * 1024 * 1024; // 50MB
     if (blob.size > MAX_SIZE) {
       toast({
         variant: "destructive",
         title: "File Too Large",
-        description: "Please select a file smaller than 50MB.",
+        description: "Maximum file size is 50MB.",
       });
       return;
     }
@@ -188,7 +188,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         contentType: blob.type || (type === 'image' ? 'image/jpeg' : type === 'video' ? 'video/mp4' : 'audio/mpeg')
       };
 
-      // Using uploadBytes instead of uploadBytesResumable for simpler single-request flow
+      // Perform upload
       const snapshot = await uploadBytes(storageRef, blob, metadata);
       const downloadUrl = await getDownloadURL(snapshot.ref);
       
@@ -216,7 +216,7 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       
       addDocumentNonBlocking(objectsCol, objectData);
 
-      // Auto-set cover image if none exists
+      // Auto-set cover image
       if (type === 'image' && (!scrapbook.coverImage || scrapbook.coverImage === "")) {
         const scrapbookRef = doc(db, "scrapbooks", scrapbook.id);
         updateDocumentNonBlocking(scrapbookRef, {
@@ -225,16 +225,18 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         });
       }
 
-      toast({ title: "Success", description: `${type} added to your canvas.` });
+      toast({ title: "Success", description: "Memory added to canvas." });
     } catch (error: any) {
+      // ADVANCED LOGGING: Capture raw server response for precision error fixing
+      const serverResponse = (error as any).customData?.serverResponse;
       console.error("[Storage Error] Code:", error.code);
-      console.error("[Storage Error] Full Details:", error);
+      console.error("[Storage Error] Full Response:", serverResponse);
       
       let errorMessage = "An unexpected error occurred.";
       if (error.code === 'storage/unauthorized') {
-        errorMessage = "Permission Denied. Storage rules have been opened, but the session might be stale.";
+        errorMessage = "Permission Denied. Storage rules have been opened, but your session might be stale.";
       } else if (error.code === 'storage/unknown') {
-        errorMessage = "Unknown error. This usually indicates a CORS policy mismatch or network interruption. Ensure docs/cors.json is applied.";
+        errorMessage = "Connection Blocked. This is likely a CORS configuration issue. Ensure docs/cors.json is applied.";
       }
 
       toast({ 
