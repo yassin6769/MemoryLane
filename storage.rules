@@ -4,7 +4,7 @@ service firebase.storage {
     /**
      * NUCLEAR PERMISSION FIX
      * Completely opens the bucket for read and write access for all users.
-     * This resolves all "storage/unauthorized" and "storage/unknown" errors by removing all security hurdles.
+     * DEPLOYMENT TRIGGER: 2024-05-20T12:00:00Z (Forces re-sync with Firebase)
      */
     match /{allPaths=**} {
       allow read, write: if true;

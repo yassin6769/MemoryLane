@@ -158,40 +158,44 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
         return;
     }
 
-    // MANDATORY: Force token refresh to ensure Storage rules recognize the session
-    try {
-      await user.getIdToken(true);
-      console.log("[Auth] Session refreshed for upload. UID:", user.uid);
-    } catch (e) {
-      console.error("[Auth] Token refresh failed:", e);
-    }
-
-    const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
-    console.log("[Storage] Initiating upload to:", storagePath);
-
-    const MAX_SIZE = 50 * 1024 * 1024; // 50MB
-    if (blob.size > MAX_SIZE) {
-      toast({
-        variant: "destructive",
-        title: "File Too Large",
-        description: "Maximum file size is 50MB.",
-      });
-      return;
-    }
-    
     setIsUploading(true);
     setCurrentMediaType(type);
 
     try {
+      // FORCE TOKEN REFRESH: This is critical for Storage rules to recognize the session.
+      console.log("[Storage] Refreshing auth token...");
+      const idToken = await user.getIdToken(true);
+      console.log("[Auth] Token refreshed. Session is active for UID:", user.uid);
+
+      const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
+      console.log("[Storage] Attempting upload to:", storagePath);
+
+      const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+      if (blob.size > MAX_SIZE) {
+        toast({
+          variant: "destructive",
+          title: "File Too Large",
+          description: "Maximum file size is 50MB.",
+        });
+        setIsUploading(false);
+        return;
+      }
+      
       const storageRef = ref(storage, storagePath);
       const metadata = {
-        contentType: blob.type || (type === 'image' ? 'image/jpeg' : type === 'video' ? 'video/mp4' : 'audio/mpeg')
+        contentType: blob.type || (type === 'image' ? 'image/jpeg' : type === 'video' ? 'video/mp4' : 'audio/mpeg'),
+        customMetadata: {
+          'uploadedBy': user.uid,
+          'scrapbookId': scrapbook.id
+        }
       };
 
-      // Perform upload using uploadBytes for better compatibility in restricted environments
+      // Use uploadBytes for simplicity in this environment
       const snapshot = await uploadBytes(storageRef, blob, metadata);
       const downloadUrl = await getDownloadURL(snapshot.ref);
       
+      console.log("[Storage] Upload successful! URL:", downloadUrl);
+
       const objectsCol = collection(db, "scrapbooks", scrapbook.id, "pages", pageId, "canvasObjects");
       const nextZIndex = items.length > 0 ? Math.max(...items.map((i: any) => i.zIndex || 0)) + 1 : 1;
 
@@ -227,16 +231,16 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
 
       toast({ title: "Success", description: "Memory added to canvas." });
     } catch (error: any) {
-      // ADVANCED LOGGING: Capture raw server response for precision debugging
+      // ADVANCED LOGGING: Capture raw server response for precision error fixing
       const serverResponse = (error as any).customData?.serverResponse;
       console.error("[Storage Error] Code:", error.code);
       console.error("[Storage Error] Full Response:", serverResponse);
       
       let errorMessage = "An unexpected error occurred.";
       if (error.code === 'storage/unauthorized') {
-        errorMessage = "Permission Denied. Storage rules have been opened to 'allow read, write: if true', but check if deployment is complete.";
+        errorMessage = "Permission denied. Security rules are set to 'if true', but please allow a few moments for deployment to complete.";
       } else if (error.code === 'storage/unknown') {
-        errorMessage = "Connection Blocked. This is likely a CORS issue. Ensure CORS is permissive in GCP Console.";
+        errorMessage = "Network or CORS error. Ensure your environment allows connections to Firebase Storage.";
       }
 
       toast({ 
