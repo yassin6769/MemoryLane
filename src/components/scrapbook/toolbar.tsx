@@ -163,33 +163,21 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
     setCurrentMediaType(type);
 
     try {
-      // FORCE TOKEN REFRESH & SYNC: Essential for ensuring open rules recognize the session immediately
-      console.log("[Storage] Syncing session with bucket:", app.options.storageBucket);
-      console.log("[Storage] Auth UID:", user.uid);
-      
-      // Explicitly await the token refresh before creating the storage reference
+      // FORCE TOKEN REFRESH & SYNC
+      // Critical step to ensure the SDK uses a valid credential that the open rules recognize.
       await user.getIdToken(true);
-      // Small delay to ensure auth state is propagated to SDK
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       const storagePath = `scrapbooks/${scrapbook.id}/${user.uid}/${Date.now()}_${fileName}`;
       const storageRef = ref(storage, storagePath);
       
-      console.log("[Storage] Initiating upload to:", storagePath);
-
       const metadata = {
         contentType: blob.type || (type === 'image' ? 'image/jpeg' : type === 'video' ? 'video/mp4' : 'audio/mpeg'),
-        customMetadata: {
-          'uploadedBy': user.uid,
-          'scrapbookId': scrapbook.id
-        }
       };
 
       const snapshot = await uploadBytes(storageRef, blob, metadata);
       const downloadUrl = await getDownloadURL(snapshot.ref);
       
-      console.log("[Storage] Upload Success:", downloadUrl);
-
       const objectsCol = collection(db, "scrapbooks", scrapbook.id, "pages", pageId, "canvasObjects");
       const nextZIndex = items.length > 0 ? Math.max(...items.map((i: any) => i.zIndex || 0)) + 1 : 1;
 
@@ -231,8 +219,6 @@ export function Toolbar({ scrapbook, pageId, items = [] }: ToolbarProps) {
       let errorMessage = "An unexpected error occurred.";
       if (error.code === 'storage/unauthorized') {
         errorMessage = "Permission denied. Please wait a few moments for security rules to deploy and try again.";
-      } else if (error.code === 'storage/unknown' || serverResponse === "") {
-        errorMessage = "Connection issues detected. Please check your network and try again.";
       }
 
       toast({ 
