@@ -5,16 +5,11 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   ImagePlus,
-  Mic,
   Share2,
   Type,
   Video,
-  CheckCircle2,
   Loader2,
   ChevronLeft,
-  AlertTriangle,
-  CircleStop,
-  Radio,
   FileAudio,
   Palette,
   Shapes,
@@ -50,7 +45,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
 interface ToolbarProps {
@@ -74,9 +68,6 @@ export function Toolbar({ scrapbook, pageId, items = [], currentPageData }: Tool
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentMediaType, setCurrentMediaType] = useState<'image' | 'video' | 'audio' | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-
-  const [isRecording, setIsRecording] = useState(false);
-  const [recorder, setRecorder] = useState<MediaRecorder | null>(null);
 
   const canvasColors = [
     { name: "Classic White", value: "#ffffff" },
@@ -129,7 +120,7 @@ export function Toolbar({ scrapbook, pageId, items = [], currentPageData }: Tool
 
       addDocumentNonBlocking(objectsCol, {
         pageId, id: "obj_" + Date.now(), type, mediaUri: downloadUrl,
-        members: scrapbook.members, x: 100, y: 100, width: 250, height: 350,
+        members: scrapbook.members, x: 100, y: 100, width: 250, height: type === 'audio' ? 150 : 350,
         rotation: 0, scaleX: 1, scaleY: 1, zIndex: nextZIndex, createdAt: serverTimestamp(),
       });
       toast({ title: "Memory added!" });
@@ -140,24 +131,9 @@ export function Toolbar({ scrapbook, pageId, items = [], currentPageData }: Tool
     }
   };
 
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      const chunks: Blob[] = [];
-      recorder.ondataavailable = (e) => chunks.push(e.data);
-      recorder.onstop = () => {
-        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
-        uploadMediaBlob(audioBlob, `voice_memo_${Date.now()}.webm`, 'audio');
-        stream.getTracks().forEach(t => t.stop());
-      };
-      setRecorder(recorder);
-      recorder.start();
-      setIsRecording(true);
-      toast({ title: "Recording Voice Memo" });
-    } catch (err) {
-      toast({ variant: "destructive", title: "Mic Access Denied" });
-    }
+  const handleTriggerUpload = (type: 'image' | 'video' | 'audio') => {
+    setCurrentMediaType(type);
+    setTimeout(() => fileInputRef.current?.click(), 0);
   };
 
   const saveText = () => {
@@ -223,7 +199,9 @@ export function Toolbar({ scrapbook, pageId, items = [], currentPageData }: Tool
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="outline" size="sm" onClick={() => { setCurrentMediaType('image'); setTimeout(() => fileInputRef.current?.click(), 0); }}><ImagePlus className="mr-2 h-4 w-4" /> Photo</Button>
+          <Button variant="outline" size="sm" onClick={() => handleTriggerUpload('image')}><ImagePlus className="mr-2 h-4 w-4" /> Photo</Button>
+          <Button variant="outline" size="sm" onClick={() => handleTriggerUpload('video')}><Video className="mr-2 h-4 w-4" /> Video</Button>
+          <Button variant="outline" size="sm" onClick={() => handleTriggerUpload('audio')}><FileAudio className="mr-2 h-4 w-4" /> Audio</Button>
           <Button variant="outline" size="sm" onClick={() => setIsTextDialogOpen(true)}><Type className="mr-2 h-4 w-4" /> Text</Button>
           
           <DropdownMenu>
@@ -238,26 +216,42 @@ export function Toolbar({ scrapbook, pageId, items = [], currentPageData }: Tool
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Mic className="mr-2 h-4 w-4" /> Voice Memo</Button></DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={isRecording ? () => { recorder?.stop(); setIsRecording(false); } : startRecording}>
-                {isRecording ? <CircleStop className="mr-2 h-4 w-4 text-destructive" /> : <Radio className="mr-2 h-4 w-4" />}
-                {isRecording ? "Stop Recording" : "Record Voice"}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
           <Button variant="outline" size="sm" onClick={() => setIsShareOpen(true)}><Share2 className="mr-2 h-4 w-4" /> Share</Button>
           <Button size="sm" onClick={handleFinalize} disabled={isFinalizing}>{isFinalizing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Finalize"}</Button>
         </div>
       </div>
-      <input type="file" ref={fileInputRef} className="hidden" accept="image/*,video/*,audio/*" onChange={(e) => { const f = e.target.files?.[0]; if (f && currentMediaType) uploadMediaBlob(f, f.name, currentMediaType); e.target.value = ''; }} />
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        className="hidden" 
+        accept={
+          currentMediaType === 'image' ? 'image/*' : 
+          currentMediaType === 'video' ? 'video/*' : 
+          'audio/*'
+        } 
+        onChange={(e) => { 
+          const f = e.target.files?.[0]; 
+          if (f && currentMediaType) uploadMediaBlob(f, f.name, currentMediaType); 
+          e.target.value = ''; 
+        }} 
+      />
       <CollaboratorDialog scrapbook={scrapbook} open={isShareOpen} onOpenChange={setIsShareOpen} />
       <Dialog open={isTextDialogOpen} onOpenChange={setIsTextDialogOpen}>
-        <DialogContent><DialogHeader><DialogTitle>Add Story Text</DialogTitle></DialogHeader>
-          <div className="py-4"><Input placeholder="The story behind this moment..." value={textInput} onChange={(e) => setTextInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveText()} /></div>
-          <DialogFooter><Button onClick={saveText}>Add to Page</Button></DialogFooter>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Story Text</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Input 
+              placeholder="The story behind this moment..." 
+              value={textInput} 
+              onChange={(e) => setTextInput(e.target.value)} 
+              onKeyDown={(e) => e.key === 'Enter' && saveText()} 
+            />
+          </div>
+          <DialogFooter>
+            <Button onClick={saveText}>Add to Page</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       <AlertDialog open={isBackDialogOpen} onOpenChange={setIsBackDialogOpen}>

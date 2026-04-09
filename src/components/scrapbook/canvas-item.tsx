@@ -8,7 +8,7 @@ import { deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { doc, getFirestore } from "firebase/firestore";
 import { ref, deleteObject } from "firebase/storage";
 import { useStorage } from "@/firebase";
-import { Trash2, FlipHorizontal, Move, Play, CircleStop, Edit3 } from "lucide-react";
+import { Trash2, FlipHorizontal, Play, CircleStop, Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import {
@@ -232,7 +232,10 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, onEdi
       case "audio":
         return (
           <div 
-            className="w-full h-full flex flex-col items-center justify-center p-4 bg-primary/10 rounded-xl border-2 border-primary/20 shadow-sm overflow-hidden"
+            className={cn(
+              "w-full h-full flex flex-col items-center justify-center p-4 bg-primary/10 rounded-xl border-2 border-primary/20 shadow-sm overflow-hidden",
+              isPlaying && "ring-4 ring-primary/30 animate-pulse"
+            )}
             style={commonStyles}
           >
             <audio 
@@ -251,7 +254,7 @@ export function CanvasItem({ item, isSelected, onSelect, onUpdatePosition, onEdi
             >
               {isPlaying ? <CircleStop className="h-6 w-6" /> : <Play className="h-6 w-6 fill-primary" />}
             </Button>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary pointer-events-none">Voice Memo</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary pointer-events-none">Audio Clip</p>
           </div>
         );
       case "shape":
