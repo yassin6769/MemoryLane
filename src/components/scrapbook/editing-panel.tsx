@@ -10,31 +10,18 @@ import {
   Maximize2, 
   Type, 
   X, 
-  Bold, 
-  Underline,
-  Plus,
-  Minus,
-  BringToFront,
-  SendToBack,
-  Square,
+  BringToFront, 
+  SendToBack, 
   Image as ImageIcon,
-  Check,
   Volume2,
   Palette,
   Layers,
   Edit3,
   Circle,
+  Square,
   Triangle
 } from "lucide-react";
 import { useAutoSave } from "@/hooks/use-auto-save";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { doc, getFirestore, serverTimestamp } from "firebase/firestore";
@@ -99,6 +86,13 @@ export function EditingPanel({
     setAlpha(newAlpha);
     onLiveUpdate(selectedItem.id, { alpha: newAlpha });
     debouncedUpdate(scrapbookId, pageId, selectedItem.id, { alpha: newAlpha });
+  };
+
+  const handleVolumeChange = (val: number[]) => {
+    const newVolume = val[0];
+    setVolume(newVolume);
+    onLiveUpdate(selectedItem.id, { volume: newVolume });
+    debouncedUpdate(scrapbookId, pageId, selectedItem.id, { volume: newVolume });
   };
 
   const handleColorChange = (color: string) => {
@@ -186,8 +180,8 @@ export function EditingPanel({
                 Edit Content
               </Button>
             )}
-            <Button variant="outline" size="icon" onClick={bringToFront}><BringToFront className="h-4 w-4" /></Button>
-            <Button variant="outline" size="icon" onClick={sendToBack}><SendToBack className="h-4 w-4" /></Button>
+            <Button variant="outline" size="icon" onClick={bringToFront} title="Bring to Front"><BringToFront className="h-4 w-4" /></Button>
+            <Button variant="outline" size="icon" onClick={sendToBack} title="Send to Back"><SendToBack className="h-4 w-4" /></Button>
             <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
           </div>
         </div>
@@ -205,10 +199,18 @@ export function EditingPanel({
           </div>
 
           <div className="space-y-6">
-            <div className="space-y-4">
-              <Label className="flex items-center gap-2 text-sm font-medium"><Layers className="h-4 w-4" /> Transparency ({alpha}%)</Label>
-              <Slider value={[alpha]} min={0} max={100} onValueChange={handleAlphaChange} />
-            </div>
+            {selectedItem.type !== 'audio' ? (
+              <div className="space-y-4">
+                <Label className="flex items-center gap-2 text-sm font-medium"><Layers className="h-4 w-4" /> Transparency ({alpha}%)</Label>
+                <Slider value={[alpha]} min={0} max={100} onValueChange={handleAlphaChange} />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <Label className="flex items-center gap-2 text-sm font-medium"><Volume2 className="h-4 w-4" /> Volume ({volume}%)</Label>
+                <Slider value={[volume]} min={0} max={100} onValueChange={handleVolumeChange} />
+              </div>
+            )}
+            
             {(selectedItem.type === 'text' || selectedItem.type === 'shape') && (
               <div className="space-y-3">
                 <Label className="flex items-center gap-2 text-sm font-medium"><Palette className="h-4 w-4" /> {selectedItem.type === 'text' ? 'Text Color' : 'Fill Color'}</Label>

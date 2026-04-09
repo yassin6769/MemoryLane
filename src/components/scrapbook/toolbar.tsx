@@ -124,7 +124,8 @@ export function Toolbar({ scrapbook, pageId, items = [], currentPageData }: Tool
         rotation: 0, scaleX: 1, scaleY: 1, zIndex: nextZIndex, createdAt: serverTimestamp(),
       });
       toast({ title: "Memory added!" });
-    } catch (error) {
+    } catch (error: any) {
+      console.error("[Storage Error] Code:", error.code);
       toast({ variant: "destructive", title: "Upload Failed" });
     } finally {
       setIsUploading(false);
