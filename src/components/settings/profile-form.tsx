@@ -1,11 +1,14 @@
+
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useFirestore, useUser } from "@/firebase";
+import { useFirestore, useUser, useStorage } from "@/firebase";
 import { doc, updateDoc, serverTimestamp, getDocs, collection, query, where } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { updateProfile } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 
 import { Button } from "@/components/ui/button";
@@ -28,7 +31,8 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2, User, Users, AtSign, Hash, Check } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Loader2, User, Users, AtSign, Hash, Check, Camera } from "lucide-react";
 
 const profileSchema = z.object({
   displayName: z.string().min(2, "Name must be at least 2 characters."),
@@ -45,8 +49,11 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export function ProfileForm({ profile }: { profile: any }) {
   const [isLoading, setIsLoading] = useState(false);
+  const [isImageUploading, setIsImageUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useUser();
   const db = useFirestore();
+  const storage = useStorage();
   const { toast } = useToast();
 
   const form = useForm<ProfileFormValues>({
@@ -59,7 +66,6 @@ export function ProfileForm({ profile }: { profile: any }) {
     },
   });
 
-  // Sync form with loaded profile data
   useEffect(() => {
     if (profile) {
       form.reset({
@@ -71,6 +77,53 @@ export function ProfileForm({ profile }: { profile: any }) {
     }
   }, [profile, form]);
 
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    // Basic size check (2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        variant: "destructive",
+        title: "File too large",
+        description: "Please select an image smaller than 2MB.",
+      });
+      return;
+    }
+
+    setIsImageUploading(true);
+    try {
+      const storageRef = ref(storage, `profiles/${user.uid}/avatar`);
+      await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // Update Auth Profile
+      await updateProfile(user, { photoURL: downloadURL });
+
+      // Update Firestore Profile
+      const userRef = doc(db, "users", user.uid);
+      await updateDoc(userRef, {
+        profileImageUrl: downloadURL,
+        updatedAt: serverTimestamp(),
+      });
+
+      toast({
+        title: "Profile Picture Updated",
+        description: "Your new avatar has been saved.",
+      });
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      toast({
+        variant: "destructive",
+        title: "Upload Failed",
+        description: "Could not upload your profile picture. Please try again.",
+      });
+    } finally {
+      setIsImageUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   async function onSubmit(values: ProfileFormValues) {
     if (!user) return;
     setIsLoading(true);
@@ -78,15 +131,12 @@ export function ProfileForm({ profile }: { profile: any }) {
     try {
       const normalizedUsername = values.username.toLowerCase();
 
-      // Check Username Uniqueness (if changed)
       if (normalizedUsername !== profile?.username) {
         const q = query(
           collection(db, "users"), 
           where("username", "==", normalizedUsername)
         );
         const querySnapshot = await getDocs(q);
-        
-        // Ensure the matching document isn't just the current user
         const isTaken = querySnapshot.docs.some(doc => doc.id !== user.uid);
         
         if (isTaken) {
@@ -96,7 +146,6 @@ export function ProfileForm({ profile }: { profile: any }) {
         }
       }
 
-      // Update Firestore
       const userRef = doc(db, "users", user.uid);
       await updateDoc(userRef, {
         displayName: values.displayName,
@@ -105,6 +154,9 @@ export function ProfileForm({ profile }: { profile: any }) {
         gender: values.gender,
         updatedAt: serverTimestamp(),
       });
+
+      // Also update auth profile display name
+      await updateProfile(user, { displayName: values.displayName });
 
       toast({
         title: "Profile Updated",
@@ -133,6 +185,44 @@ export function ProfileForm({ profile }: { profile: any }) {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <CardContent className="space-y-6">
+            
+            {/* Profile Picture Section */}
+            <div className="flex flex-col items-center gap-4 mb-8">
+              <div className="relative group">
+                <Avatar className="h-24 w-24 border-2 border-primary/20">
+                  <AvatarImage src={user?.photoURL || ""} />
+                  <AvatarFallback className="text-2xl bg-primary/10 text-primary">
+                    {user?.displayName?.charAt(0) || <User className="h-10 w-10" />}
+                  </AvatarFallback>
+                </Avatar>
+                {isImageUploading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-background/60 rounded-full">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  size="sm" 
+                  disabled={isImageUploading}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {isImageUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Camera className="h-4 w-4 mr-2" />}
+                  Change Photo
+                </Button>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  accept="image/*"
+                  onChange={handleImageChange}
+                />
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">JPG, PNG or GIF (Max 2MB)</p>
+              </div>
+            </div>
+
             {/* Read-Only UID Display */}
             <FormItem className="bg-muted/30 p-4 rounded-lg border border-dashed">
               <FormLabel className="flex items-center gap-2 text-muted-foreground">

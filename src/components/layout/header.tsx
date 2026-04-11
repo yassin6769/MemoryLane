@@ -2,10 +2,10 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Menu, Settings, Users, Library, Phone, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useUser } from "@/firebase";
 
 import {
   DropdownMenu,
@@ -17,10 +17,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Logo } from "../icons/logo";
 
 export default function AppHeader() {
   const pathname = usePathname();
+  const { user } = useUser();
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
@@ -79,36 +81,34 @@ export default function AppHeader() {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
-            className="overflow-hidden rounded-full"
+            className="rounded-full h-9 w-9 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            <Image
-              src="https://picsum.photos/seed/301/40/40"
-              width={36}
-              height={36}
-              alt="Avatar"
-              className="overflow-hidden"
-              data-ai-hint="person portrait"
-            />
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={user?.photoURL || ""} alt={user?.displayName || "User avatar"} />
+              <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                {user?.displayName?.charAt(0) || "U"}
+              </AvatarFallback>
+            </Avatar>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>My Account</DropdownMenuLabel>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel className="font-headline">My Account</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
-            <Link href="/settings" className="flex items-center gap-2">
+            <Link href="/settings" className="flex items-center gap-2 cursor-pointer">
               <Settings className="h-4 w-4" /> Settings
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href="/contact" className="flex items-center gap-2">
+            <Link href="/contact" className="flex items-center gap-2 cursor-pointer">
               <Phone className="h-4 w-4" /> Contact Us
             </Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
-            <Link href="/" className="flex items-center gap-2 text-destructive focus:text-destructive">
+            <Link href="/" className="flex items-center gap-2 text-destructive focus:text-destructive cursor-pointer">
               <LogOut className="h-4 w-4" /> Logout
             </Link>
           </DropdownMenuItem>
