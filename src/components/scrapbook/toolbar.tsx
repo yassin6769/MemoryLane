@@ -179,7 +179,6 @@ export function Toolbar({ scrapbook, pageId, items = [], currentPageData }: Tool
           </div>
         </div>
         
-        {/* Scrollable actions for mobile */}
         <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 no-scrollbar">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
