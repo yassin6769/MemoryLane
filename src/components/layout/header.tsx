@@ -1,9 +1,10 @@
+
 "use client";
 
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, Settings, Users, Library } from "lucide-react";
+import { Menu, Settings, Users, Library, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import {
@@ -98,7 +99,11 @@ export default function AppHeader() {
           <DropdownMenuItem asChild>
             <Link href="/settings">Settings</Link>
           </DropdownMenuItem>
-          <DropdownMenuItem>Support</DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/contact" className="flex items-center gap-2">
+              <Phone className="h-4 w-4" /> Contact Us
+            </Link>
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
             <Link href="/">Logout</Link>
