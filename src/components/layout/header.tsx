@@ -4,7 +4,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, Settings, Users, Library, Phone } from "lucide-react";
+import { Menu, Settings, Users, Library, Phone, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import {
@@ -97,7 +97,9 @@ export default function AppHeader() {
           <DropdownMenuLabel>My Account</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
-            <Link href="/settings">Settings</Link>
+            <Link href="/settings" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" /> Settings
+            </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/contact" className="flex items-center gap-2">
@@ -106,7 +108,9 @@ export default function AppHeader() {
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
-            <Link href="/">Logout</Link>
+            <Link href="/" className="flex items-center gap-2 text-destructive focus:text-destructive">
+              <LogOut className="h-4 w-4" /> Logout
+            </Link>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
