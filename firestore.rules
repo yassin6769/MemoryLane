@@ -5,7 +5,7 @@ service cloud.firestore {
     /**
      * NUCLEAR PERMISSION FIX
      * Completely opens the database for read and write access for all users.
-     * DEPLOYMENT TRIGGER: 2025-05-26T06:45:00Z (SHARED_ME_FIX)
+     * DEPLOYMENT TRIGGER: 2025-05-26T12:00:00Z (SHARED_CANVAS_SYNC)
      */
     match /{allPaths=**} {
       allow read, write: if true;
