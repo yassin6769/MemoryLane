@@ -15,7 +15,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "../ui/button";
-import { MoreVertical, CheckCircle2, Trash2, Share2, ExternalLink, AlertTriangle, FileText } from "lucide-react";
+import { MoreVertical, CheckCircle2, Trash2, Share2, ExternalLink, AlertTriangle, FileText, Users } from "lucide-react";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -34,7 +34,7 @@ import {
   AlertDialogTitle 
 } from "@/components/ui/alert-dialog";
 import { CollaboratorDialog } from "../scrapbook/collaborator-dialog";
-import { useFirestore } from "@/firebase";
+import { useFirestore, useUser } from "@/firebase";
 import { deleteScrapbook } from "@/data/scrapbooks";
 import { useToast } from "@/hooks/use-toast";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
@@ -46,11 +46,14 @@ interface ScrapbookCardProps {
 export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
   const router = useRouter();
   const db = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const isShared = user && scrapbook.ownerId !== user.uid;
 
   /**
    * DYNAMIC COVER LOGIC:
@@ -109,14 +112,20 @@ export default function ScrapbookCard({ scrapbook }: ScrapbookCardProps) {
         className="group flex flex-col overflow-hidden h-full transform transition-all duration-300 hover:shadow-xl relative border-muted/60 bg-card/50 backdrop-blur-sm cursor-pointer"
         onClick={handleCardClick}
       >
-        {scrapbook.isFinalized && (
-          <div className="absolute top-3 right-3 z-10">
+        <div className="absolute top-3 right-3 z-10 flex gap-2">
+          {scrapbook.isFinalized && (
             <Badge className="bg-green-500/90 text-white gap-1 backdrop-blur-md border-none shadow-sm">
               <CheckCircle2 className="h-3.5 w-3.5" />
               Finalized
             </Badge>
-          </div>
-        )}
+          )}
+          {isShared && (
+            <Badge className="bg-primary/90 text-primary-foreground gap-1 backdrop-blur-md border-none shadow-sm">
+              <Users className="h-3.5 w-3.5" />
+              Shared
+            </Badge>
+          )}
+        </div>
         
         <div className="flex-grow">
           <CardHeader className="p-0">

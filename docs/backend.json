@@ -36,6 +36,11 @@
           "description": "Map of UID to role: 'owner', 'editor', or 'viewer'.",
           "additionalProperties": { "type": "string" }
         },
+        "sharedWith": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Array of UIDs of users who have been granted access (excluding owner)."
+        },
         "isFinalized": { "type": "boolean" },
         "isPublic": { "type": "boolean" },
         "coverImage": { "type": "string", "format": "uri" },

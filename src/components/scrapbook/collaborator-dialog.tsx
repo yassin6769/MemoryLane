@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -68,12 +69,22 @@ export function CollaboratorDialog({ scrapbook, open, onOpenChange }: Collaborat
     if (!inviteUid.trim()) return;
     
     const scrapbookRef = doc(db, "scrapbooks", scrapbookId);
+    
+    // Update both members map (for rules) and sharedWith array (for specific queries)
     const updatedMembers = {
       ...(scrapbook.members || {}),
       [inviteUid]: "editor",
     };
 
-    updateDocumentNonBlocking(scrapbookRef, { members: updatedMembers });
+    const currentSharedWith = scrapbook.sharedWith || [];
+    const updatedSharedWith = currentSharedWith.includes(inviteUid) 
+      ? currentSharedWith 
+      : [...currentSharedWith, inviteUid];
+
+    updateDocumentNonBlocking(scrapbookRef, { 
+      members: updatedMembers,
+      sharedWith: updatedSharedWith
+    });
     
     toast({
       title: "Invitation Sent",

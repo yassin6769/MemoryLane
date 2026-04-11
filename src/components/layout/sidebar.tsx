@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -49,7 +50,7 @@ export default function AppSidebar() {
           <Tooltip>
             <TooltipTrigger asChild>
               <Link
-                href="#"
+                href="/shared"
                 className={cn(
                   "flex h-9 w-9 items-center justify-center rounded-lg transition-colors md:h-8 md:w-8",
                   pathname === "/shared" 

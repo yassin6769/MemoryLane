@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -25,7 +26,7 @@ export default function BottomNav() {
     },
     {
       label: "Shared",
-      href: "#",
+      href: "/shared",
       icon: Users,
     },
     {

@@ -40,6 +40,7 @@ export async function createScrapbook(
     members: {
       [user.uid]: 'owner', // Required by Security Rules
     },
+    sharedWith: [], // Initialized for "Shared with Me" queries
     isFinalized: false,
     isPublic: false,
     coverImage: "",

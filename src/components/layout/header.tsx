@@ -53,7 +53,7 @@ export default function AppHeader() {
               My Scrapbooks
             </Link>
             <Link
-              href="#"
+              href="/shared"
               className={cn(
                 "flex items-center gap-4 px-2.5 transition-colors",
                 pathname === "/shared" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
