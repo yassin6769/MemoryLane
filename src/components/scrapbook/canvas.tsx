@@ -1,3 +1,4 @@
+
 "use client";
 
 import { CanvasItem } from "./canvas-item";
@@ -67,7 +68,7 @@ export function Canvas({
     <div className={cn("flex flex-col gap-4 h-full preserve-3d backface-hidden", className)}>
       <div
         onClick={handleCanvasClick}
-        className="relative w-full h-[80vh] rounded-lg overflow-hidden border shadow-inner preserve-3d cursor-crosshair transition-colors duration-500"
+        className="relative w-full h-[60vh] sm:h-[80vh] rounded-lg overflow-hidden border shadow-inner preserve-3d cursor-crosshair transition-colors duration-500"
         style={{
           backgroundColor: backgroundColor,
           backgroundImage:
@@ -88,9 +89,9 @@ export function Canvas({
           />
         ))}
         {items.length === 0 && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground pointer-events-none">
-            <p className="text-xl font-headline opacity-40">Empty Canvas</p>
-            <p className="text-sm opacity-30">Use the toolbar to add media and memories.</p>
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground pointer-events-none p-4">
+            <p className="text-xl font-headline opacity-40 text-center">Empty Canvas</p>
+            <p className="text-sm opacity-30 text-center">Use the toolbar to add media and memories.</p>
           </div>
         )}
       </div>
